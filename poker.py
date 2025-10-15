@@ -4,47 +4,160 @@ import math
 import random
 import numpy as np
 
+class Card():
+	def __init__(self):
+		# A card has the following properties:
+		# A figure: from 2 to 10 or Jack, Queen, King, Ace
+		# An associated value: from 2 to 14
+		# A color: Heart, Spikes, Clubs, Diamonds
+		# A name
+		# A pictogram (later: TODO)
+
+		self.name: str
+		self.figure: str
+		self.color: str 
+		self.value : int 
+	
+	def init_figure_and_name(self):
+		value_to_string={
+			2: "Two",
+			3: "Three",
+			4: "Four",
+			5: "Five",
+			6: "Six",
+			7: "Seven",
+			8: "Eight",
+			9: "Nine",
+			10: "Ten",
+			11: "Jack",
+			12: "Queen",
+			13: "King",
+			14: "Ace"}
+			
+		self.figure = value_to_string[self.value]
+		self.name = ' '.join([self.figure,"of",self.color])
+
 class deckOfCards():
 	def __init__(self):
-		# a card has a value between 1 and 13 represented by 4 bits and a color represented by 2 bit
-		# e.g., the king of spade is 0b110000
-
-		# self.values = np.arange(2,11)
-		# self.heads = ['Jack', 'Queen', 'King', 'Ace']
-		# self.colors = ['Diamonds', 'Clubs', 'Hearts', 'Spikes']
-		self.values = np.arange(12)
+		self.deck= []
+		self.init_deck()
 	
-	def build_deck(self):
-		deck = []
-		col = 0b00
-		while col <= 0b11:
-			for col in range(4):
-				value = 0b000001
-				while value < 14:
-					print(bin(value))
-					print(bin(col))
-					print(bin (value<<2 + col))
-					input()
-					value += 1
-				col += 1
+	def init_deck(self):
+		for color in ["Heart", "Spikes", "Clubs", "Diamonds"]:
+			for i in range (2,15):
+				cardObject = Card()
+				cardObject.value = i
+				cardObject.color = color
+				cardObject.init_figure_and_name()
 
-					# deck.append((val<<2 + col))
-					# print('\n')
-					# print(bin(val))
-					# print(bin(col))
-					# print((bin(val<<2) + bin(col)))
-					# input()
+				self.deck.append(cardObject)
 
-		return deck
+	def display_deck(self):
+		for card in self.deck:
+			print(card.name)
 
-	def lookup(b):
-		# spade = 0x00, heart = 0x01, clubs = 0x10, diamond = 0x11
-		value_mask = 0b111100
-		color_mask = 0b000011
-		return b & value_mask, b & color_mask
+	def shuffle_deck(self):
+		random.shuffle(self.deck)
+	
+	def draw(self):
+		card = self.deck.pop()
+		# print(card)
+		# print(50*'-',deck)
+		# discard_pile.append(card)
 
-deck_class = deckOfCards()
-print(deck_class.build_deck())
+		return deck, card
+
+class PokerRules():
+	def __init__():
+		pass
+	def bets_handler(self):
+		# Handles all bet rules, pot, blinds, and bet increase
+		# also handles betting rounds between plays
+		pass
+	def plays(self):
+		# handles reveal of cards (flop, turn, river, showdown)
+		pass
+	def get_hand_value(self):
+		pass
+
+class playerClass():
+	def __init__(self,n):
+		self.name:str
+		self.hand: list
+		self.money: int
+		# self.bet: int
+	
+	def create_player(self,name):
+		self.name = name
+		self.hand = []
+		self.money = 5000 #TODO set as a global value
+		# self.bet = 0
+
+	def clear_hand(self):
+		self.hand = []
+
+if __name__=="__main__":
+	deck = deckOfCards()
+	deck.shuffle_deck()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# class deckOfCards():
+# 	def __init__(self):
+# 		# a card has a value between 1 and 13 represented by 4 bits and a color represented by 2 bit
+# 		# e.g., the king of spade is 0b110000
+
+# 		# self.values = np.arange(2,11)
+# 		# self.heads = ['Jack', 'Queen', 'King', 'Ace']
+# 		# self.colors = ['Diamonds', 'Clubs', 'Hearts', 'Spikes']
+# 		self.values = np.arange(12)
+	
+# 	def build_deck(self):
+# 		deck = []
+# 		col = 0b00
+# 		while col <= 0b11:
+# 			for col in range(4):
+# 				value = 0b000001
+# 				while value < 14:
+# 					print(bin(value))
+# 					print(bin(col))
+# 					print(bin (value<<2 + col))
+# 					input()
+# 					value += 1
+# 				col += 1
+
+# 					# deck.append((val<<2 + col))
+# 					# print('\n')
+# 					# print(bin(val))
+# 					# print(bin(col))
+# 					# print((bin(val<<2) + bin(col)))
+# 					# input()
+
+# 		return deck
+
+# 	def lookup(b):
+# 		# spade = 0x00, heart = 0x01, clubs = 0x10, diamond = 0x11
+# 		value_mask = 0b111100
+# 		color_mask = 0b000011
+# 		return b & value_mask, b & color_mask
+
+# deck_class = deckOfCards()
+# print(deck_class.build_deck())
 
 
 
