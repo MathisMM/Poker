@@ -11,7 +11,7 @@ class Card():
 		# An associated value: from 2 to 14
 		# A color: Heart, Spikes, Clubs, Diamonds
 		# A name
-		# A pictogram (later: TODO)
+		# A pictogram (TODO - front end)
 
 		self.name: str
 		self.figure: str
@@ -52,54 +52,245 @@ class deckOfCards():
 
 				self.deck.append(cardObject)
 
-	def display_deck(self):
-		for card in self.deck:
-			print(card.name)
-
 	def shuffle_deck(self):
 		random.shuffle(self.deck)
 	
-	def draw(self):
-		card = self.deck.pop()
-		# print(card)
-		# print(50*'-',deck)
-		# discard_pile.append(card)
+	def draw(self,n):
+		cards = []
+		for i in range(n):
+			cards.append(self.deck.pop())
 
-		return deck, card
+		return cards
+
+	def display_deck(self):
+		print("\nDeck:\n",[card.name for card in self.deck])
+		print("Deck size:",len(self.deck))
 
 class PokerRules():
-	def __init__():
-		pass
-	def bets_handler(self):
+	def __init__(self):
+		self.cards_on_table: list
+		self.small_blind: int
+		self.big_blind: int
+		self.pot: int
+
+	def init_table(self, players):
+		self.players = players
+		self.cards_on_table = []
+		self.small_blind = 5
+		self.big_blind = 10
+		self.pot = 0
+
+	def betting_round(self):
 		# Handles all bet rules, pot, blinds, and bet increase
-		# also handles betting rounds between plays
-		pass
-	def plays(self):
-		# handles reveal of cards (flop, turn, river, showdown)
-		pass
-	def get_hand_value(self):
-		pass
+
+		for player in self.players:
+			player.bet = 10
+			player.money -= player.bet
+
+			# while all players are either out of game or have the same bets
+			# print(player.name,"'s bet:")
+			# player.bet = input()
+			# while player.bet < self.big_blind:
+				# print("Invalid bet, minimum is",self.big_blind)
+				# print(player.name,"'s bet:")
+				# player.bet = input()
+
+	def bets_to_pot(self):
+		for player in self.players:
+			self.pot += player.bet
+			player.bet = 0
+
+	@staticmethod
+	def is_straight(cards):
+		# print('cards:', cards)
+		
+		# Ace low straight
+		if cards[:4]==[2,3,4,5] and 14 in cards:
+			return True, [14] + cards[:4]
+		
+		while len(cards)>=5:
+			# print('cards:', cards)
+			for i in range(4):
+				# comparing highest cards (to get highest straight)
+				if cards[4-i-1] != cards[4-i]-1:
+					# not a straight
+					cards.pop()		# remove highest value
+					break
+
+			# if all cards values follow each other: straight (i.e., no break in for loop)
+			else: 
+				return True, cards[-5:]
+		
+		# Exhausted list
+		return False, []
+
+
+
+	def get_hand_value(self, player_hand):
+		# High card: single value of highest card
+		# Pair: 2 cards of same value
+		# Two pairs: two times 2 cards of the same value
+		# Three of a kind: 3 cards of the same value
+		# Straight: sequence of 5 cards in increasing value (Ace can precede 2 or follow up King, but not both), not of the same suit
+		# straight: 5 cards of the same suit, not in sequential order	
+		# Full House: Combination of three of a kind and a pair	
+		# Four of a kind: Four cards of the same value	
+		# Straight flush: Straight of the same suit	
+		# Royal flush: Highest straight of the same suit	
+		
+		cards = player_hand + self.cards_on_table
+		
+		# DEBUG
+		deck = deckOfCards()
+		cards = deck.deck[-9:-2]
+		cards[2] = deck.deck[8]
+
+		sorted_cards = sorted(cards, key=lambda card: card.value)
+		sorted_cards_values = [card.value for card in sorted_cards]
+		sorted_cards_colors = [card.color for card in sorted_cards]
+
+		print([card.name for card in sorted_cards])
+		print(sorted_cards_values)
+		print(sorted_cards_colors)
+		
+		if len(sorted_cards_values) >= 5:	# cannot have straight unless at least 5 cards of different values
+			#royal flush:
+			if (sorted_cards_values[-5:] == [10,11,12,13,14]) and (all(sorted_cards_colors[-5:])):
+				print('royal flush')
+
+			# # Check for straight
+			# if self.is_straight(sorted_cards):
+			# 	pass
+
+
+
+
+	def display_table(self):
+		print("Cards on table:")
+		print([card.name for card in self.cards_on_table])
+
+		print("\nPot:",self.pot)
+
+		print("\nCurrent bets:")
+		for player in self.players:
+			print(player.name,":",player.bet)
 
 class playerClass():
-	def __init__(self,n):
+	def __init__(self):
 		self.name:str
 		self.hand: list
 		self.money: int
-		# self.bet: int
+		self.bet: int
+		self.hand_value: str
 	
 	def create_player(self,name):
 		self.name = name
 		self.hand = []
-		self.money = 5000 #TODO set as a global value
-		# self.bet = 0
+		self.money = 5000 #TODO set as a global value (min_entry_fee)
+		self.bet = 0
+		self.hand_value = None
 
 	def clear_hand(self):
 		self.hand = []
+		self.bet = 0
+		self.hand_value = None
+	
+	def display_player_info(self):
+		print(self.name,":")
+		print("Hand:",[card.name for card in self.hand])
+		print("Money: ", self.money)
 
 if __name__=="__main__":
+	# Init a deck of cards
 	deck = deckOfCards()
 	deck.shuffle_deck()
 
+	# Init players
+	# for now: hard set
+	player_list = []
+	for i in range(1,6):
+		playerObject = playerClass()
+		playerObject.create_player("Player "+str(i))
+		player_list.append(playerObject)
+	
+	# print([vars(player) for player in player_list])
+
+	game = PokerRules()
+	while(1):
+		# Setting up game
+		game.init_table(player_list)
+
+		# Distribute cards
+		for player in player_list:
+			player.hand = deck.draw(2)
+
+		print(50*"-","Player Infos",50*"-")
+		for player in player_list:
+			player.display_player_info()
+
+		# pre-flop
+		print(50*"-","Pre-Flop",50*"-")
+		game.betting_round()
+		game.display_table()
+
+		print("\nPlayer Infos:\n")
+		for player in player_list:
+			player.display_player_info()
+		
+		# flop
+		print(50*"-","Flop",50*"-")
+		game.bets_to_pot()
+		game.cards_on_table=deck.draw(3)
+		game.betting_round()
+
+
+		game.display_table()
+		deck.display_deck()
+
+		print("\nPlayer Infos:\n")
+		for player in player_list:
+			player.display_player_info()
+
+
+		# turn
+		print(50*"-","Turn",50*"-")
+		game.bets_to_pot()
+		game.cards_on_table.append(deck.draw(1)[0])
+		game.betting_round()
+
+
+		game.display_table()
+		deck.display_deck()
+
+		print("\nPlayer Infos:\n")
+		for player in player_list:
+			player.display_player_info()
+
+		# river
+		print(50*"-","River",50*"-")
+		game.bets_to_pot()
+		game.cards_on_table.append(deck.draw(1)[0])
+		game.betting_round()
+
+
+		game.display_table()
+		deck.display_deck()
+
+		print("\nPlayer Infos:\n")
+		for player in player_list:
+			player.display_player_info()
+
+		# showdown
+		print(50*"-","Showdown",50*"-")
+		for player in player_list:
+			player.hand_value = game.get_hand_value(player.hand)
+			break
+
+
+
+
+
+		break
 
 
 
@@ -265,7 +456,7 @@ if __name__=="__main__":
 # 	# Two pairs: two times 2 cards of the same value
 # 	# Three of a kind: 3 cards of the same value
 # 	# Straight: sequence of 5 cards in increasing value (Ace can precede 2 or follow up King, but not both), not of the same suit
-# 	# Flush: 5 cards of the same suit, not in sequential order	
+# 	# straight: 5 cards of the same suit, not in sequential order	
 # 	# Full House: Combination of three of a kind and a pair	
 # 	# Four of a kind: Four cards of the same value	
 # 	# Straight flush: Straight of the same suit	
