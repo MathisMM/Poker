@@ -241,8 +241,8 @@ class PokerRules():
 				
 				straight_type = 1
 		
-		# Testing for Ace low / wheel.
-		if all(elem in sorted_cards_values for elem in [2,3,4,5,14]):
+		# Testing for Ace low / wheel. Skipped if we already found a higher flush
+		if all(elem in sorted_cards_values for elem in [2,3,4,5,14]) and straight_type<2:
 			print("found ace low")
 			# Ace low found:
 			ace_low_cards = [item for item in sorted_cards if item.value in [2,3,4,5,14]]
@@ -291,7 +291,9 @@ class PokerRules():
 		# cards = deck.deck[:2] + deck.deck[5:10] # high straight
 		# cards = deck.deck[8:13] + [deck.deck[38]] + [deck.deck[24]] # straight + royal flush
 		# cards = deck.deck[:4] + [deck.deck[25]]+ [deck.deck[50]] + [deck.deck[13]] # Ace low straight
-		# cards = deck.deck[:4] + [deck.deck[24]]+ [deck.deck[50]] + [deck.deck[13]] # Ace low flush
+		cards = deck.deck[:4] + [deck.deck[25]]+ [deck.deck[50]] + [deck.deck[12]] # Ace low flush
+		cards = deck.deck[:5] + [deck.deck[25]] + [deck.deck[12]] # Ace low flush + straight
+		# cards = deck.deck[:4] + [deck.deck[24]]+ [deck.deck[50]] + [deck.deck[13]] # four of a kind		
 		print([card.name for card in cards])
 
 		straight_output, straight_type = self.is_straight(cards)
@@ -304,8 +306,8 @@ class PokerRules():
 		
 		# four of a kind
 		
-		# value_counts = Counter(cards_values)
-		# print(value_counts)
+		value_counts = Counter(cards_values)
+		print(value_counts)
 		# # full house
 
 		if straight_type == 1:
