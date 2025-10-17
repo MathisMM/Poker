@@ -3,6 +3,9 @@
 import math
 import random
 import numpy as np
+import copy
+from collections import Counter
+
 
 class Card():
 	def __init__(self):
@@ -100,33 +103,143 @@ class PokerRules():
 			self.pot += player.bet
 			player.bet = 0
 
+	# @staticmethod
+	# def is_straight_flush(cards):
+	# 	pass
+
+	# @staticmethod
+	# def is_straight(cards):
+	# 	# print('cards:', cards)
+	# 	# remove redundent cards
+	# 	cards_list = copy.deepcopy(cards)
+	# 	for i in range(len(cards)-1):
+	# 		if cards[i].value == cards[i+1].value:
+	# 			cards_list.remove(cards_list[i+1])
+
+	# 	cards_values_list = [card.value for card in cards_list]
+	# 	cards_color_list = [card.color for card in cards_list]
+
+	# 	print([card.name for card in cards_list])
+	# 	print(cards_values_list)
+	# 	print(cards_color_list)
+		
+	# 	# Ace low straight
+	# 	if cards_values_list[:4]==[2,3,4,5] and 14 in cards_values_list:
+	# 		return True, [cards_list[-1]] + cards_list[:4]
+		
+	# 	# while len(cards)>=5:
+	# 	# 	# print('cards:', cards)
+	# 	# 	for i in range(4):
+	# 	# 		# comparing highest cards (to get highest straight)
+	# 	# 		if cards[4-i-1] != cards[4-i]-1:
+	# 	# 			# not a straight
+	# 	# 			cards.pop()		# remove highest value
+	# 	# 			break
+
+	# 	# 	# if all cards values follow each other: straight (i.e., no break in for loop)
+	# 	# 	else: 
+	# 	# 		return True, cards[-5:]
+		
+	# 	# # Exhausted list
+	# 	# return False, []
+
 	@staticmethod
 	def is_straight(cards):
-		# print('cards:', cards)
-		
-		# Ace low straight
-		if cards[:4]==[2,3,4,5] and 14 in cards:
-			return True, [14] + cards[:4]
-		
-		while len(cards)>=5:
-			# print('cards:', cards)
-			for i in range(4):
-				# comparing highest cards (to get highest straight)
-				if cards[4-i-1] != cards[4-i]-1:
-					# not a straight
-					cards.pop()		# remove highest value
+		# Checks if straight, straight flush, or royal flush
+		# input: 
+		# - sorted_cards: list of 7 sorted cards
+		# output: 
+		# - output_cards: list either empty or five straight cards
+		# - straight_type: int corresponding to type of straight (0 is none, 1 straight, 2 straight flush, 3 royal)
+		sorted_cards = sorted(cards, key=lambda card: card.value)
+		sorted_cards_values = [card.value for card in sorted_cards]
+		mem_index_list = []
+
+		'''
+		Behaviour: 
+		- Starting at the left of the list len(sorted_cards_values) - k, k = 1
+		- Memorize the starting index in index
+		- Initialize a counter unit_cnt to 1, to count the number of unique cards encountered
+		- Initialize a counter cnt to 1, to count the number of cards in each possible straights
+		- Parsing the list from right to left. As long as each value are successive (i.e value at [i]-1 == value at [i-1]), or the same
+		increment cnt. If the values are the same, continue but without parsing cnt.
+		- If two cards are apart by more than 1 point, two choices:
+			1) cnt >= 5 indicates the presence of at least 1 straight from this index (5 unique cards or more that follow each others).
+			In this case the couple (index, cnt) is memorized in mem_index_list.
+			2) cnt < 5 : no possiblity for a straight, simple break.
+
+		- Repeat for index = 6, 5, 4. Lower than 4, no straight is possible.
+
+		Note: a cnt = 5 is not enough to stop the program because of the possiblity of a lower straight to be a flush.
+		Example: [2 of spade, 3 of spade, 4 of spade, 5 of spade, 6 of spade, 7 of spade, 8 of heart]
+		In this example, a lower straight (from 2 to 7) constitutes a flush, which is better than the higher straight (from 3 to 8)
+		'''
+
+		for index in range(6,3,-1):
+			# print('0 index:', index)
+			cnt = 1
+			unit_cnt = 1
+			for i in range(index,0,-1):
+				if sorted_cards_values[i] == sorted_cards_values[i-1]:
+					cnt+=1 # same card values
+					# print(i,':',sorted_cards_values[i],'-',sorted_cards_values[i-1],"mem:",index,"cnt:",cnt)
+				elif sorted_cards_values[i]-1 == sorted_cards_values[i-1]:
+					cnt+=1 # successive card values
+					unit_cnt+=1
+					# print(i,':',sorted_cards_values[i],'-',sorted_cards_values[i-1],"mem:",index,"cnt:",cnt)
+				else:
+					# non-successive cards
+					# print(i,':',sorted_cards_values[i],'-',sorted_cards_values[i-1],"mem:",index,"cnt:",cnt)
+					if unit_cnt >= 5:
+						# only if there are at least 5 unique cards can there be a straight
+						mem_index_list.append((index,cnt)) # memorize index and number or successive cards
 					break
-
-			# if all cards values follow each other: straight (i.e., no break in for loop)
-			else: 
-				return True, cards[-5:]
+			if unit_cnt>=5:
+				# in case the for loop completed without breaking out (straight from top to bottom)
+				mem_index_list.append((index,cnt))
+			
+			# print(mem_index_list)
 		
-		# Exhausted list
-		return False, []
+		'''
+		Each element of mem_index_list is a couple (index position, size of straight)
+		The next processing step extracts each straights and tests for flushes.
+		If a flush is found, it is returned. Because we parse from high to low, we know the first flush to be found will be the highest.
+		Else, we return the highest straight without doubles.
+		'''
 
+		if mem_index_list:
+			# test for flushes
+			for item in mem_index_list:
+				output_cards = sorted_cards[item[0]-item[1]+1:item[0]+1]
+				output_cards_colors = [card.color for card in output_cards]
+				
+				counts = Counter(output_cards_colors)
+				# counts.most_common(1)[0][0] : top 1 most common color 
+				# counts.most_common(1)[0][1] : number of element of top 1 most common color 
+				
+				if counts.most_common(1)[0][1] >=5:
+					# found a flush !!
+					output_cards = [card for card in output_cards if card.color==counts.most_common(1)[0][0]]
+					if [card.value for card in output_cards] == [10,11,12,13,14]:
+						# Royal flush !!
+						return output_cards, 3
+					else: 
+						return output_cards, 2
+		
+			# no flush, return only the straight without duplicate values
+			item = mem_index_list[0]
+			tmp = sorted_cards[item[0]-item[1]+1:item[0]+1]
+			output_cards = [tmp[0]]
+			for i in range (1,len(tmp)):
+				if tmp[i].value != tmp[i-1].value:
+					output_cards.append(tmp[i])
 
+			return output_cards, 1
+		# no straight
+		return [], 0
+			
 
-	def get_hand_value(self, player_hand):
+	def get_hand_value(self, player):
 		# High card: single value of highest card
 		# Pair: 2 cards of same value
 		# Two pairs: two times 2 cards of the same value
@@ -137,30 +250,34 @@ class PokerRules():
 		# Four of a kind: Four cards of the same value	
 		# Straight flush: Straight of the same suit	
 		# Royal flush: Highest straight of the same suit	
-		
+		player_hand = player.hand
 		cards = player_hand + self.cards_on_table
+		print("Cards for",player.name)
+		print([card.name for card in cards])
 		
-		# DEBUG
-		deck = deckOfCards()
-		cards = deck.deck[-9:-2]
-		cards[2] = deck.deck[8]
-
-		sorted_cards = sorted(cards, key=lambda card: card.value)
-		sorted_cards_values = [card.value for card in sorted_cards]
-		sorted_cards_colors = [card.color for card in sorted_cards]
-
-		print([card.name for card in sorted_cards])
-		print(sorted_cards_values)
-		print(sorted_cards_colors)
+		# # DEBUG
+		# deck = deckOfCards()
+		# # cards = deck.deck[-9:-2]
+		# # cards[2] = deck.deck[8]
+		# # cards = deck.deck[:2] + deck.deck[5:10]
+		# # cards[5] = deck.deck[25]
+		# # cards.insert(0,deck.deck[25])
+		# cards = deck.deck[8:13] + [deck.deck[38]] + [deck.deck[24]]
+		straight_output, straight_type = self.is_straight(cards)
+		if straight_type == 3:
+			print(player.name,"has a Royal Flush:")
+			print([card.value for card in straight_output])
+		if straight_type == 2:
+			print(player.name,"has a Straight Flush:")
+			print([card.value for card in straight_output])
 		
-		if len(sorted_cards_values) >= 5:	# cannot have straight unless at least 5 cards of different values
-			#royal flush:
-			if (sorted_cards_values[-5:] == [10,11,12,13,14]) and (all(sorted_cards_colors[-5:])):
-				print('royal flush')
+		# four of a kind
 
-			# # Check for straight
-			# if self.is_straight(sorted_cards):
-			# 	pass
+		# full house
+
+		if straight_type == 1:
+			print(player.name,"has a Straight:")
+			print([card.name for card in straight_output])
 
 
 
@@ -283,8 +400,8 @@ if __name__=="__main__":
 		# showdown
 		print(50*"-","Showdown",50*"-")
 		for player in player_list:
-			player.hand_value = game.get_hand_value(player.hand)
-			break
+			player.hand_value = game.get_hand_value(player)
+			input()
 
 
 
