@@ -154,6 +154,8 @@ class PokerRules():
 		sorted_cards = sorted(cards, key=lambda card: card.value)
 		sorted_cards_values = [card.value for card in sorted_cards]
 		mem_index_list = []
+		output_cards = []
+		straight_type = 0
 
 		'''
 		Behaviour: 
@@ -222,21 +224,44 @@ class PokerRules():
 					output_cards = [card for card in output_cards if card.color==counts.most_common(1)[0][0]]
 					if [card.value for card in output_cards] == [10,11,12,13,14]:
 						# Royal flush !!
-						return output_cards, 3
+						straight_type = 3
+						break
 					else: 
-						return output_cards, 2
+						straight_type = 2
+						break
 		
 			# no flush, return only the straight without duplicate values
-			item = mem_index_list[0]
-			tmp = sorted_cards[item[0]-item[1]+1:item[0]+1]
-			output_cards = [tmp[0]]
-			for i in range (1,len(tmp)):
-				if tmp[i].value != tmp[i-1].value:
-					output_cards.append(tmp[i])
+			if not straight_type:
+				item = mem_index_list[0]
+				tmp = sorted_cards[item[0]-item[1]+1:item[0]+1]
+				output_cards = [tmp[0]]
+				for i in range (1,len(tmp)):
+					if tmp[i].value != tmp[i-1].value:
+						output_cards.append(tmp[i])
+				
+				straight_type = 1
+		
+		# Testing for Ace low / wheel.
+		if all(elem in sorted_cards_values for elem in [2,3,4,5,14]):
+			print("found ace low")
+			# Ace low found:
+			ace_low_cards = [item for item in sorted_cards if item.value in [2,3,4,5,14]]
+			counts = Counter([card.color for card in ace_low_cards])
+			
+			if counts.most_common(1)[0][1] >=5:
+				# found a flush !! Note: Royal flush is impossible
+				output_cards = [card for card in ace_low_cards if card.color==counts.most_common(1)[0][0]]
+				straight_type = 2
+			elif not straight_type: # did not find another straight earlier
+				tmp = [ace_low_cards[0]]
+				for i in range (1,len(ace_low_cards)):
+					if ace_low_cards[i].value != ace_low_cards[i-1].value:
+						tmp.append(ace_low_cards[i])
+				output_cards = tmp
+				straight_type = 1
 
-			return output_cards, 1
 		# no straight
-		return [], 0
+		return output_cards, straight_type
 			
 
 	def get_hand_value(self, player):
@@ -252,28 +277,36 @@ class PokerRules():
 		# Royal flush: Highest straight of the same suit	
 		player_hand = player.hand
 		cards = player_hand + self.cards_on_table
+
+		cards_values = [card.value for card in cards]
+		cards_colors = [card.color for card in cards]
+
 		print("Cards for",player.name)
 		print([card.name for card in cards])
 		
 		# # DEBUG
-		# deck = deckOfCards()
-		# # cards = deck.deck[-9:-2]
-		# # cards[2] = deck.deck[8]
-		# # cards = deck.deck[:2] + deck.deck[5:10]
-		# # cards[5] = deck.deck[25]
-		# # cards.insert(0,deck.deck[25])
-		# cards = deck.deck[8:13] + [deck.deck[38]] + [deck.deck[24]]
+		deck = deckOfCards()
+		# cards = deck.deck[-9:-2] # regular straight
+		# cards[2] = deck.deck[8] # add to regular to make non-straight
+		# cards = deck.deck[:2] + deck.deck[5:10] # high straight
+		# cards = deck.deck[8:13] + [deck.deck[38]] + [deck.deck[24]] # straight + royal flush
+		# cards = deck.deck[:4] + [deck.deck[25]]+ [deck.deck[50]] + [deck.deck[13]] # Ace low straight
+		# cards = deck.deck[:4] + [deck.deck[24]]+ [deck.deck[50]] + [deck.deck[13]] # Ace low flush
+		print([card.name for card in cards])
+
 		straight_output, straight_type = self.is_straight(cards)
 		if straight_type == 3:
 			print(player.name,"has a Royal Flush:")
-			print([card.value for card in straight_output])
+			print([card.name for card in straight_output])
 		if straight_type == 2:
 			print(player.name,"has a Straight Flush:")
-			print([card.value for card in straight_output])
+			print([card.name for card in straight_output])
 		
 		# four of a kind
-
-		# full house
+		
+		# value_counts = Counter(cards_values)
+		# print(value_counts)
+		# # full house
 
 		if straight_type == 1:
 			print(player.name,"has a Straight:")
@@ -401,8 +434,8 @@ if __name__=="__main__":
 		print(50*"-","Showdown",50*"-")
 		for player in player_list:
 			player.hand_value = game.get_hand_value(player)
-			input()
-
+			# input()
+			break
 
 
 
