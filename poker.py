@@ -40,12 +40,13 @@ class Card():
 		self.figure = value_to_string[self.value]
 		self.name = ' '.join([self.figure,"of",self.color])
 
-class deckOfCards():
+class DeckOfCards():
 	def __init__(self):
-		self.deck= []
+		self.deck: list
 		self.init_deck()
 	
 	def init_deck(self):
+		self.deck=[]
 		for color in ["Heart", "Spikes", "Clubs", "Diamonds"]:
 			for i in range (2,15):
 				cardObject = Card()
@@ -57,7 +58,11 @@ class deckOfCards():
 
 	def shuffle_deck(self):
 		random.shuffle(self.deck)
-	
+
+	def reset_deck(self):
+		self.init_deck()
+		random.shuffle(self.deck)
+
 	def draw(self,n):
 		cards = []
 		for i in range(n):
@@ -69,80 +74,162 @@ class deckOfCards():
 		print("\nDeck:\n",[card.name for card in self.deck])
 		print("Deck size:",len(self.deck))
 
-class PokerRules():
+class PokerGame():
 	def __init__(self):
 		self.cards_on_table: list
 		self.small_blind: int
 		self.big_blind: int
 		self.pot: int
 
-	def init_table(self, players):
+	def init_game(self, players):
 		self.players = players
 		self.cards_on_table = []
 		self.small_blind = 5
 		self.big_blind = 10
 		self.pot = 0
+	
+	def reset_table(self):
+		self.cards_on_table = []
+		self.pot = 0
 
-	def betting_round(self):
-		# Handles all bet rules, pot, blinds, and bet increase
+	def init_blinds(self):
+		self.players[-1].blind = "big_blind"
+		self.players[-2].blind = "small_blind"
+		self.players[-3].blind = "button"
 
-		for player in self.players:
-			player.bet = 10
-			player.money -= player.bet
+	def rotate_blinds(self):
+		self.players.insert(0,self.players.pop())
+		if len(self.players)>2:
+			self.players[-1].blind = "big_blind"
+			self.players[-2].blind = "small_blind"
+			self.players[-3].blind = "button"
+			if len(self.players)>3:
+				for i in range(4,len(self.players)+1):
+					self.players[-i].blind = ""
 
-			# while all players are either out of game or have the same bets
-			# print(player.name,"'s bet:")
-			# player.bet = input()
-			# while player.bet < self.big_blind:
-				# print("Invalid bet, minimum is",self.big_blind)
-				# print(player.name,"'s bet:")
-				# player.bet = input()
+		else:
+			# final (1v1)
+			self.players[0].blind = "small_blind"
+			self.players[1].blind = "big_blind"
+
+	def betting_round(self, round):
+		# Errors definition
+		class InsufficientFundsError(Exception):
+			pass
+		class InvalidBetError(Exception):
+			pass
+		class InvalidBetInputError(Exception):
+			pass
+
+		# Handles betting system
+		if round == 0:
+			# pre-flop first betting round
+			for player in self.players:
+				if player.blind == "big_blind":
+					player.bet = self.big_blind
+				if player.blind == "small_blind":
+					player.bet = self.small_blind
+
+		current_bet = self.big_blind
+
+		while len(set([player.bet for player in self.players if player.status == "inGame"]))!=1: # while players have different bets
+			# convert list of player bets into a set and checks set size. If set size == 1 => all bets are the same
+			# [player.display_player_info() for player in self.players]
+			for player in self.players:
+
+				# break loop in case we started over because a player raised
+				if len(set([player.bet for player in self.players if player.status == "inGame"]))==1:
+					break
+				
+				all_in_flag=False
+				while True:
+					if all_in_flag:
+						break
+
+					# Decides to bet or fold:
+					print("\nCurrent bet to match:",current_bet)
+					print("Current player betted amount:",player.bet)
+					print(player.name,"input decision:")
+					print('1: Call')
+					print('2: Raise')
+					print('3: Fold')
+
+					try:
+						player_choice = input()
+
+						# Call bet
+						if player_choice == '1':
+							print(player.name,"Checks") if current_bet==0 else print(player.name,"Calls")
+							if player.money<current_bet:
+								raise InsufficientFundsError("Insufficient funds. Go all in ? y/n")
+							player.bet = current_bet	# update player bet if valid
+
+						# Raise bet
+						elif player_choice == '2':
+							while True:
+								print(player.name,"Opens") if current_bet==0 else print(player.name,"Raises")
+								print("Input bet:")
+								try :
+									player.bet = int(input())	# set new bet
+								except ValueError:
+									print("Invalid input, must be a number")
+									continue
+								
+								# Check player has enough money and that bet is valid (>= bid blind)
+								if player.bet<self.big_blind:
+									raise InvalidBetError ("Invalid bet. Bet needs to be at least the big blind ($%s)"%(self.big_blind))
+								if player.money<player.bet:
+									raise InsufficientFundsError("Insufficient funds. Go all in ? y/n")
+								if player.money==player.bet:
+									raise InsufficientFundsError("Go all in ? y/n")
+
+
+								# if bet valid
+								current_bet = player.bet	# update current highest bet
+								break
+						
+						# Fold
+						elif player_choice == '3':
+							player.status = "Folded" # update status
+						
+						else:
+							raise InvalidBetInputError("Invalid input.")
+						
+						# if input valid
+						break # next player
+
+					except (InvalidBetInputError, InvalidBetError) as e:
+						print(f"Error: {e}")
+						continue # re-prompt player
+					except (InsufficientFundsError) as e:
+						print(f"Error: {e}")
+						while True:
+							all_in_input = input()
+							if all_in_input in ['y', 'Y']:
+								player.bet = player.money
+								current_bet = player.bet
+								player.money = 0
+								all_in_flag = True
+								break
+							if all_in_input in ['n', 'N']:
+								break
+							else:
+								print("invalid input, please press 'y' or 'n'.")
+						continue # re-prompt player
 
 	def bets_to_pot(self):
+		# updates pot and player money
 		for player in self.players:
 			self.pot += player.bet
+			player.money-=player.bet
 			player.bet = 0
+	
+	def pot_distrib(self):
+		# Handles pot distribution at the end of a round
+		#TODO: all in system (add a betting history)
+		pass
 
-	# @staticmethod
-	# def is_straight_flush(cards):
-	# 	pass
-
-	# @staticmethod
-	# def is_straight(cards):
-	# 	# print('cards:', cards)
-	# 	# remove redundent cards
-	# 	cards_list = copy.deepcopy(cards)
-	# 	for i in range(len(cards)-1):
-	# 		if cards[i].value == cards[i+1].value:
-	# 			cards_list.remove(cards_list[i+1])
-
-	# 	cards_values_list = [card.value for card in cards_list]
-	# 	cards_color_list = [card.color for card in cards_list]
-
-	# 	print([card.name for card in cards_list])
-	# 	print(cards_values_list)
-	# 	print(cards_color_list)
-		
-	# 	# Ace low straight
-	# 	if cards_values_list[:4]==[2,3,4,5] and 14 in cards_values_list:
-	# 		return True, [cards_list[-1]] + cards_list[:4]
-		
-	# 	# while len(cards)>=5:
-	# 	# 	# print('cards:', cards)
-	# 	# 	for i in range(4):
-	# 	# 		# comparing highest cards (to get highest straight)
-	# 	# 		if cards[4-i-1] != cards[4-i]-1:
-	# 	# 			# not a straight
-	# 	# 			cards.pop()		# remove highest value
-	# 	# 			break
-
-	# 	# 	# if all cards values follow each other: straight (i.e., no break in for loop)
-	# 	# 	else: 
-	# 	# 		return True, cards[-5:]
-		
-	# 	# # Exhausted list
-	# 	# return False, []
-
+	
 	@staticmethod
 	def is_straight(cards):
 		# Checks if straight, straight flush, or royal flush
@@ -280,7 +367,7 @@ class PokerRules():
 		
 		
 		# # DEBUG
-		deck = deckOfCards()
+		deck = DeckOfCards()
 		# cards = deck.deck[-9:-2] # regular straight
 		# cards[2] = deck.deck[8] # add to regular to make non-straight
 		# cards = deck.deck[:2] + deck.deck[5:10] # high straight
@@ -393,13 +480,6 @@ class PokerRules():
 			hand_val = 0
 			return hand, hand_val
 
-
-			
-
-
-
-
-
 	def display_table(self):
 		print("Cards on table:")
 		print([card.name for card in self.cards_on_table])
@@ -412,20 +492,26 @@ class PokerRules():
 
 class playerClass():
 	def __init__(self):
-		self.name:str
-		self.hand: list
-		self.money: int
-		self.bet: int
-		self.final_hand = list
-		self.hand_value: str
+		self.name:str				# The name of the player
+		self.hand: list				# The two cards distributed to the player
+		self.money: int				# The amount of money the player has
+		self.bet: int				# The amount of money the player bets at each turn
+		self.betting_hist: int		# The total amount of a player's bet. Used when bets exceed a player's money (all in)
+		self.blind: str				# Big/Small blind or Button
+		self.status: str			# inGame / Folded
+		self.final_hand = list		# The final hand composed of the two distributed cards and the five common cards
+		self.hand_value: int		# The value of the final hand (ex: 0 for high card, 1 for pair, etc...)
 	
 	def create_player(self,name):
 		self.name = name
 		self.hand = []
 		self.money = 5000 #TODO set as a global value (min_entry_fee)
+		self.betting_hist = 0
 		self.bet = 0
-		self.hand_value = None
+		self.blind = ""
+		self.status = "inGame"
 		self.final_hand=[]
+		self.hand_value = 0
 
 	def clear_hand(self):
 		self.hand = []
@@ -436,12 +522,15 @@ class playerClass():
 	def display_player_info(self):
 		print(self.name,":")
 		print("Hand:",[card.name for card in self.hand])
-		print("Money: ", self.money)
+		print("Money:", self.money)
+		print("Current bet:", self.bet)
+		print("Blind:", self.blind)
+		print("Status:", self.status)
+		print()
 
 if __name__=="__main__":
 	# Init a deck of cards
-	deck = deckOfCards()
-	deck.shuffle_deck()
+	deck = DeckOfCards()
 
 	# Init players
 	# for now: hard set
@@ -453,11 +542,16 @@ if __name__=="__main__":
 	
 	# print([vars(player) for player in player_list])
 
-	game = PokerRules()
-	while(1):
-		# Setting up game
-		game.init_table(player_list)
+	# Setting up game
+	game = PokerGame()
+	game.init_game(player_list)
+	game.init_blinds()
 
+	while(1):
+		# reset table cards and deck of cards (re-shuffled)
+		deck.reset_deck()
+		game.reset_table()
+		
 		# Distribute cards
 		for player in player_list:
 			player.hand = deck.draw(2)
@@ -468,55 +562,54 @@ if __name__=="__main__":
 
 		# pre-flop
 		print(50*"-","Pre-Flop",50*"-")
-		game.betting_round()
+		game.betting_round(0)
+		game.bets_to_pot()
+
 		game.display_table()
 
 		print("\nPlayer Infos:\n")
-		for player in player_list:
-			player.display_player_info()
+		print([player.display_player_info() for player in player_list])
+
+		
 		
 		# flop
 		print(50*"-","Flop",50*"-")
-		game.bets_to_pot()
 		game.cards_on_table=deck.draw(3)
-		game.betting_round()
-
+		game.betting_round(1)
 
 		game.display_table()
 		deck.display_deck()
 
 		print("\nPlayer Infos:\n")
-		for player in player_list:
-			player.display_player_info()
+		print([player.display_player_info() for player in player_list])
 
+		game.bets_to_pot()
 
 		# turn
 		print(50*"-","Turn",50*"-")
-		game.bets_to_pot()
 		game.cards_on_table.append(deck.draw(1)[0])
-		game.betting_round()
-
+		game.betting_round(2)
 
 		game.display_table()
 		deck.display_deck()
 
 		print("\nPlayer Infos:\n")
-		for player in player_list:
-			player.display_player_info()
+		print([player.display_player_info() for player in player_list])
+
+		game.bets_to_pot()
 
 		# river
 		print(50*"-","River",50*"-")
-		game.bets_to_pot()
 		game.cards_on_table.append(deck.draw(1)[0])
-		game.betting_round()
-
+		game.betting_round(3)
 
 		game.display_table()
 		deck.display_deck()
 
 		print("\nPlayer Infos:\n")
-		for player in player_list:
-			player.display_player_info()
+		print([player.display_player_info() for player in player_list])
+
+		game.bets_to_pot()
 
 		# showdown
 		print(50*"-","Showdown",50*"-")
@@ -526,4 +619,6 @@ if __name__=="__main__":
 			print('hand_val:',player.hand_value)
 			input()
 
-		break
+		game.rotate_blinds()
+
+		input()
