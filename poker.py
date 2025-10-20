@@ -263,26 +263,21 @@ class PokerRules():
 		# no straight
 		return output_cards, straight_type
 			
-
 	def get_hand_value(self, player):
 		# High card: single value of highest card
 		# Pair: 2 cards of same value
 		# Two pairs: two times 2 cards of the same value
 		# Three of a kind: 3 cards of the same value
 		# Straight: sequence of 5 cards in increasing value (Ace can precede 2 or follow up King, but not both), not of the same suit
-		# straight: 5 cards of the same suit, not in sequential order	
 		# Full House: Combination of three of a kind and a pair	
 		# Four of a kind: Four cards of the same value	
 		# Straight flush: Straight of the same suit	
 		# Royal flush: Highest straight of the same suit	
 		player_hand = player.hand
 		cards = player_hand + self.cards_on_table
-
-		cards_values = [card.value for card in cards]
-		cards_colors = [card.color for card in cards]
-
-		print("Cards for",player.name)
-		print([card.name for card in cards])
+		hand=[]
+		hand_val = 0
+		
 		
 		# # DEBUG
 		deck = deckOfCards()
@@ -291,28 +286,116 @@ class PokerRules():
 		# cards = deck.deck[:2] + deck.deck[5:10] # high straight
 		# cards = deck.deck[8:13] + [deck.deck[38]] + [deck.deck[24]] # straight + royal flush
 		# cards = deck.deck[:4] + [deck.deck[25]]+ [deck.deck[50]] + [deck.deck[13]] # Ace low straight
-		cards = deck.deck[:4] + [deck.deck[25]]+ [deck.deck[50]] + [deck.deck[12]] # Ace low flush
-		cards = deck.deck[:5] + [deck.deck[25]] + [deck.deck[12]] # Ace low flush + straight
-		# cards = deck.deck[:4] + [deck.deck[24]]+ [deck.deck[50]] + [deck.deck[13]] # four of a kind		
+		# cards = deck.deck[:4] + [deck.deck[25]]+ [deck.deck[50]] + [deck.deck[12]] # Ace low flush
+		# cards = deck.deck[:5] + [deck.deck[25]] + [deck.deck[12]] # Ace low flush + straight
+		# cards = deck.deck[:3] + [deck.deck[11]] + [deck.deck[24]] + [deck.deck[50]] + [deck.deck[37]] # four of a kind
+		# cards = deck.deck[:3] + [deck.deck[27]] + [deck.deck[24]] + [deck.deck[50]] + [deck.deck[37]] # Full house
+		# cards = [deck.deck[0]] + [deck.deck[13]]+ [deck.deck[26]]+ [deck.deck[28]] \
+		# 	+ [deck.deck[24]] + [deck.deck[50]] + [deck.deck[37]] # two threes of a kind (house)
+		# cards = [deck.deck[1]] + [deck.deck[12]]+ [deck.deck[26]]+ [deck.deck[28]] \
+		# 	+ [deck.deck[24]] + [deck.deck[50]] + [deck.deck[37]] # three of a kind
+		# cards = [deck.deck[0]] + [deck.deck[13]]+ [deck.deck[28]]+ [deck.deck[28]] \
+		# 	+ [deck.deck[25]] + [deck.deck[50]] + [deck.deck[38]] # three pairs
+		# cards = [deck.deck[5]] + [deck.deck[14]]+ [deck.deck[28]]+ [deck.deck[28]] \
+		# 	+ [deck.deck[25]] + [deck.deck[50]] + [deck.deck[38]] # two pairs
+		# cards = [deck.deck[5]] + [deck.deck[19]]+ [deck.deck[32]]+ [deck.deck[28]] \
+		# 	+ [deck.deck[25]] + [deck.deck[50]] + [deck.deck[40]] # single pair
+		# cards = [deck.deck[5]] + [deck.deck[0]]+ [deck.deck[32]]+ [deck.deck[28]] \
+		# 	+ [deck.deck[25]] + [deck.deck[50]] + [deck.deck[40]] # High card
+		cards_values = [card.value for card in cards]
+		cards_colors = [card.color for card in cards]
+
+		print("Cards for",player.name)
 		print([card.name for card in cards])
-
-		straight_output, straight_type = self.is_straight(cards)
-		if straight_type == 3:
+		
+		# Flushes
+		hand, straight_hand_type = self.is_straight(cards)
+		if straight_hand_type == 3:
 			print(player.name,"has a Royal Flush:")
-			print([card.name for card in straight_output])
-		if straight_type == 2:
-			print(player.name,"has a Straight Flush:")
-			print([card.name for card in straight_output])
-		
-		# four of a kind
-		
-		value_counts = Counter(cards_values)
-		print(value_counts)
-		# # full house
+			hand_val = 8
+			return hand, hand_val
 
-		if straight_type == 1:
+		elif straight_hand_type == 2:
+			print(player.name,"has a Straight Flush:")
+			hand_val = 7
+			return hand, hand_val
+		
+		# Four of a kind
+		value_counts = Counter(cards_values)
+		if value_counts.most_common(1)[0][1] == 4:
+			hand = [card for card in cards if card.value == value_counts.most_common(1)[0][0]]
+			print(player.name,"has Four of a Kind:")
+			hand_val = 6
+			return hand, hand_val
+
+		# Full house
+		#TODO: use case 3 - 2 - 2 => need to take the highest pair here 
+		#TODO: priviledge full house to three of a kind if 3 - 3 
+		elif value_counts.most_common(2)[0][1] == 3 and value_counts.most_common(2)[1][1]>=2:
+			if value_counts.most_common(2)[1][1]==3:
+				# Full house with double triple cards
+				hand = [card for card in cards \
+						if card.value == value_counts.most_common(2)[0][0] \
+						or card.value == value_counts.most_common(2)[1][0]]
+				if value_counts.most_common(2)[0][0] > value_counts.most_common(2)[1][0]:
+					hand = hand[:-1]	 # remove last element to get 3 and 2 cards
+				else:
+					hand.remove(hand[2]) # remove third element to get 3 and 2 cards
+			else:
+				# second most common occurence is of 2 cards: regular house
+				if value_counts.most_common(3)[1][0] > value_counts.most_common(3)[2][0]:
+					hand = [card for card in cards \
+							if card.value == value_counts.most_common(2)[0][0] \
+							or card.value == value_counts.most_common(2)[1][0]]
+				else:
+					hand = [card for card in cards \
+							if card.value == value_counts.most_common(1)[0][0] \
+							or card.value == value_counts.most_common(3)[2][0]]
+			print(player.name,"has a Full house:")
+			hand_val = 5
+			return hand, hand_val
+		
+		# Straight
+		elif straight_hand_type == 1:
 			print(player.name,"has a Straight:")
-			print([card.name for card in straight_output])
+			hand_val = 4
+			return hand, hand_val
+		
+		# Three of a kind
+		elif value_counts.most_common(2)[0][1] == 3 and value_counts.most_common(2)[1][1] < 3: 
+			# we want to avoid going here if there are 2 threes of a kind because that is a full house (use case described before).
+			print(player.name,"has a Three of a kind:")
+			hand = [card for card in cards if card.value == value_counts.most_common(1)[0][0]]
+			hand_val = 3
+			return hand, hand_val
+
+		# Pairs
+		pair_cnt = 0
+		pairs_val = sorted([item[0] for item in value_counts.most_common(3) if item[1]==2])
+		pair_cnt = len(pairs_val)
+		
+		if pair_cnt >= 2:
+			print(player.name,"has Two Pairs:")	
+			hand = [card for card in cards if card.value in pairs_val[-2:]]
+			hand_val = 2
+			return hand, hand_val
+
+		elif pair_cnt == 1: 
+			print(player.name,"has a Pair:")
+			hand = [card for card in cards if card.value in pairs_val[-1:]]
+			hand_val = 1
+			return hand, hand_val
+		
+		# High card
+		else:
+			print(player.name,"has a High Card:")
+			hand = [sorted(cards, key=lambda card: card.value)[-1]]
+			hand_val = 0
+			return hand, hand_val
+
+
+			
+
 
 
 
@@ -333,6 +416,7 @@ class playerClass():
 		self.hand: list
 		self.money: int
 		self.bet: int
+		self.final_hand = list
 		self.hand_value: str
 	
 	def create_player(self,name):
@@ -341,11 +425,13 @@ class playerClass():
 		self.money = 5000 #TODO set as a global value (min_entry_fee)
 		self.bet = 0
 		self.hand_value = None
+		self.final_hand=[]
 
 	def clear_hand(self):
 		self.hand = []
 		self.bet = 0
 		self.hand_value = None
+		self.final_hand = []
 	
 	def display_player_info(self):
 		print(self.name,":")
@@ -435,255 +521,9 @@ if __name__=="__main__":
 		# showdown
 		print(50*"-","Showdown",50*"-")
 		for player in player_list:
-			player.hand_value = game.get_hand_value(player)
-			# input()
-			break
-
-
-
+			player.final_hand, player.hand_value = game.get_hand_value(player)
+			print([card.name for card in player.final_hand])
+			print('hand_val:',player.hand_value)
+			input()
 
 		break
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# class deckOfCards():
-# 	def __init__(self):
-# 		# a card has a value between 1 and 13 represented by 4 bits and a color represented by 2 bit
-# 		# e.g., the king of spade is 0b110000
-
-# 		# self.values = np.arange(2,11)
-# 		# self.heads = ['Jack', 'Queen', 'King', 'Ace']
-# 		# self.colors = ['Diamonds', 'Clubs', 'Hearts', 'Spikes']
-# 		self.values = np.arange(12)
-	
-# 	def build_deck(self):
-# 		deck = []
-# 		col = 0b00
-# 		while col <= 0b11:
-# 			for col in range(4):
-# 				value = 0b000001
-# 				while value < 14:
-# 					print(bin(value))
-# 					print(bin(col))
-# 					print(bin (value<<2 + col))
-# 					input()
-# 					value += 1
-# 				col += 1
-
-# 					# deck.append((val<<2 + col))
-# 					# print('\n')
-# 					# print(bin(val))
-# 					# print(bin(col))
-# 					# print((bin(val<<2) + bin(col)))
-# 					# input()
-
-# 		return deck
-
-# 	def lookup(b):
-# 		# spade = 0x00, heart = 0x01, clubs = 0x10, diamond = 0x11
-# 		value_mask = 0b111100
-# 		color_mask = 0b000011
-# 		return b & value_mask, b & color_mask
-
-# deck_class = deckOfCards()
-# print(deck_class.build_deck())
-
-
-
-# 	def build_deck(self):
-# 		deck = []
-# 		for color in self.colors:
-# 			for value in self.values:
-# 				deck.append(str(value)+' of '+color)
-			
-# 			for head in self.heads:
-# 				deck.append(str(head)+' of '+color)
-# 		return deck
-
-# 	def shuffle_deck(self, deck):
-# 		random.shuffle(deck)
-# 		return deck
-	
-# 	def draw(self, deck):
-# 		card = deck.pop()
-# 		# print(card)
-# 		# print(50*'-',deck)
-# 		# discard_pile.append(card)
-
-# 		return deck, card
-	
-# class playerClass():
-# 	def __init__(self,n):
-# 		self.name='Player '+str(n) # Default
-# 		self.hand = []
-# 		self.money = 5000
-# 		self.bet = 0
-
-# 	def clear_hand(self):
-# 		self.hand = []
-
-# def display_player_status(player_list):
-# 	for item in player_list:
-# 		print(vars(item))
-
-# def get_card_value(card):
-# 	value_name = card.split(' of ')[0]
-
-# 	if value_name in ['Jack', 'Queen', 'King', 'Ace']:
-# 		if value_name == 'Jack':
-# 			value = 11
-# 		elif value_name == 'Queen':
-# 			value = 12
-# 		elif value_name == 'King':
-# 			value = 13
-# 		elif value_name == 'Ace':
-# 			value = 14
-# 	else:
-# 		value = int(value_name) 
-	
-# 	return value
-
-# def sort_hand(hand):
-# 	# init sorted hand
-# 	sorted_hand = ['15','15','15','15','15','15','15']
-	
-# 	# sort
-# 	for i in range(7):
-# 		for j in range(len(hand)):
-# 			if get_card_value(hand[j])<get_card_value(sorted_hand[i]):
-# 				sorted_hand[i]= hand[j]
-# 		hand.remove(sorted_hand[i])
-# 	# print('\nhand:',hand)
-# 	# print('sorted_hand:',sorted_hand)
-
-# 	return sorted_hand
-
-
-# def is_straight_hand(hand):
-# 	sorted_hand = sort_hand(hand)
-# 	sorted_hand= ['8 of Clubs', '8 of Hearts', '10 of Hearts', 'Jack of Hearts', 'Queen of Clubs', 'King of Hearts', 'Ace of Diamonds']
-	
-# 	print('sorted_hand:',sorted_hand)
-# 	flags = [True, True, True]
-
-# 	for i in range(0, 4):
-# 		if not get_card_value(sorted_hand[i])+1==get_card_value(sorted_hand[i+1]):
-# 			flags[0]= False
-# 	for i in range(1, 5):
-# 		if not get_card_value(sorted_hand[i])+1==get_card_value(sorted_hand[i+1]):
-# 			flags[1]= False
-# 	for i in range(2, 6):
-# 		if not get_card_value(sorted_hand[i])+1==get_card_value(sorted_hand[i+1]):
-# 			flags[2]= False
-
-# 	if True in flags:
-# 		return True
-# 	else:
-# 		return False
-	
-# 	# For now returns if there is a straight but since the valeus are calculated over 5 cards (not 7) 
-# 	# need it to check for the highest straight
-
-
-
-
-
-# def get_hand_values(hand):
-# 	# High card: single value of highest card
-# 	# Pair: 2 cards of same value
-# 	# Two pairs: two times 2 cards of the same value
-# 	# Three of a kind: 3 cards of the same value
-# 	# Straight: sequence of 5 cards in increasing value (Ace can precede 2 or follow up King, but not both), not of the same suit
-# 	# straight: 5 cards of the same suit, not in sequential order	
-# 	# Full House: Combination of three of a kind and a pair	
-# 	# Four of a kind: Four cards of the same value	
-# 	# Straight flush: Straight of the same suit	
-# 	# Royal flush: Highest straight of the same suit	
-	
-# 	# print(is_straight_hand(hand))
-
-# 	if is_straight_hand(hand):
-# 		# Check for Royal, i.e if 1st is 8
-# 		# for i in range(len(sorted_hand)-1):
-# 		# 	if not get_card_value(sorted_hand[i])+1==get_card_value(sorted_hand[i+1]):
-# 		# 		return False
-# 	# return True
-
-
-
-
-
-
-
-
-# deck_fct = deckOfCards()
-# deck = deck_fct.build_deck()
-# deck = deck_fct.shuffle_deck(deck)
-# print(deck)
-
-# #TODO: try/exept
-# nbr_players = int(input('number of players:'))
-# assert int(nbr_players) < 11 
-
-# player_list=[]
-# for n in range(nbr_players):
-# 	player_list.append(playerClass(n+1))
-
-# display_player_status(player_list)
-# table = []
-
-
-# # Dealing
-# for i in range (2):
-# 	for player in player_list:
-# 		deck, card = deck_fct.draw(deck) 
-# 		player.hand.append(card)
-# print('deck_size:',len(deck))
-# display_player_status(player_list)
-# # TODO: Pre-flop
-
-# # Flop
-# for i in range(3):
-# 	deck, card = deck_fct.draw(deck)
-# 	table.append(card)
-# print('Table:', table)
-
-# # TODO: Betting 
-
-# # Turn
-# deck, card = deck_fct.draw(deck)
-# table.append(card)
-# print('Table:', table)
-
-# # TODO: Betting 
-
-# # River
-# deck, card = deck_fct.draw(deck)
-# table.append(card)
-# print('Table:', table)
-
-# # Showdown
-# for player in player_list:
-# 	total_cards = table + player.hand
-# 	print(player.name, ':', total_cards)
-# 	# input()
-# 	get_hand_values(total_cards)
-# 	input()	
-	
-	
-		
-
