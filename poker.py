@@ -112,7 +112,7 @@ class PokerGame():
 			self.players[0].blind = "small_blind"
 			self.players[1].blind = "big_blind"
 
-	def betting_round(self, round):
+	def human_play(self, player):
 		# Errors definition
 		class InsufficientFundsError(Exception):
 			pass
@@ -121,6 +121,85 @@ class PokerGame():
 		class InvalidBetInputError(Exception):
 			pass
 
+		# Decides to bet or fold:
+		print("\nCurrent bet to match:",self.current_bet)
+		print("Current player betted amount:",player.bet)
+		print("Current player money:",player.money)
+		print(player.name,"input decision:")
+		print('1: Call')
+		print('2: Raise')
+		print('3: Fold')
+
+		try:
+			player_choice = input()
+
+			# Call bet
+			if player_choice == '1':
+				print(player.name,"Checks") if self.current_bet==0 else print(player.name,"Calls")
+				if player.money<self.current_bet:
+					raise InsufficientFundsError("Insufficient funds. Go all in ? y/n")
+				player.bet = self.current_bet	# update player bet if valid
+
+			# Raise bet
+			elif player_choice == '2':
+				while True:
+					print(player.name,"Opens") if self.current_bet==0 else print(player.name,"Raises")
+					print("Input bet:")
+					try :
+						player.bet = int(input())	# set new bet
+					except ValueError:
+						print("Invalid input, must be a number")
+						continue
+					
+					# Check player has enough money and that bet is valid (>= bid blind)
+					if player.bet<self.big_blind:
+						raise InvalidBetError ("Invalid bet. Bet needs to be at least the big blind ($%s)"%(self.big_blind))
+					if player.money<player.bet:
+						raise InsufficientFundsError("Insufficient funds. Go all in ? y/n")
+					if player.money==player.bet:
+						raise InsufficientFundsError("Go all in ? y/n")
+
+
+					# if bet valid
+					self.current_bet = player.bet	# update current highest bet
+					break	# exit raise check loop
+			
+			# Fold
+			elif player_choice == '3':
+				player.status = "Folded" # update status
+			
+			else:
+				raise InvalidBetInputError("Invalid input.")
+			
+			# if input valid
+			return 1 # next player
+
+		except (InvalidBetInputError, InvalidBetError) as e:
+			print(f"Error: {e}")
+			return 0 # re-prompt player
+		except (InsufficientFundsError) as e:
+			print(f"Error: {e}")
+			while True:
+				all_in_input = input()
+				if all_in_input in ['y', 'Y']:
+					player.bet = player.money
+					self.current_bet = player.bet
+					player.is_all_in = True
+					break
+				if all_in_input in ['n', 'N']:
+					player.bet = 0
+					break
+				else:
+					print("invalid input, please press 'y' or 'n'.")
+			return 0 # re-prompt player
+	
+	def AI_play(self):
+		# no security check for now (debug version)
+		print(player.name,"Checks") if self.current_bet==0 else print(player.name,"Calls")
+		player.bet = self.current_bet	# Current default behaviour: call all bet
+		return 1 # next player
+
+	def betting_round(self, round):
 		# Handles betting system
 		if round == 0:
 			# pre-flop first betting round
@@ -129,99 +208,117 @@ class PokerGame():
 					player.bet = self.big_blind
 				if player.blind == "small_blind":
 					player.bet = self.small_blind
+			self.current_bet = self.big_blind
+		else:
+			self.current_bet = 0	# allows for checks in later rounds 
 
-		current_bet = self.big_blind
+		bet_flag = False # dummy flag to go through while loop at least once
 
-		while len(set([player.bet for player in self.players if player.status == "inGame"]))!=1: # while players have different bets
+		while (len(set([player.bet for player in self.players if player.status == "inGame"]))!=1) or (bet_flag==False): # while players have different bets
 			# convert list of player bets into a set and checks set size. If set size == 1 => all bets are the same
 			# [player.display_player_info() for player in self.players]
 			for player in self.players:
-
+				
 				# break loop in case we started over because a player raised
-				if len(set([player.bet for player in self.players if player.status == "inGame"]))==1:
+				if len(set([player.bet for player in self.players if player.status == "inGame"]))==1 and bet_flag == True :
 					break
 				
-				all_in_flag=False
-				while True:
-					if all_in_flag:
+				next_player = 0
+				while not next_player:
+					if player.is_all_in:
+						print(player.name,"is already All-in.")
 						break
 
-					# Decides to bet or fold:
-					print("\nCurrent bet to match:",current_bet)
-					print("Current player betted amount:",player.bet)
-					print(player.name,"input decision:")
-					print('1: Call')
-					print('2: Raise')
-					print('3: Fold')
+					if player.is_human:
+						next_player = self.human_play(player)
 
-					try:
-						player_choice = input()
+					if not player.is_human :
+						next_player = self.AI_play(player)
 
-						# Call bet
-						if player_choice == '1':
-							print(player.name,"Checks") if current_bet==0 else print(player.name,"Calls")
-							if player.money<current_bet:
-								raise InsufficientFundsError("Insufficient funds. Go all in ? y/n")
-							player.bet = current_bet	# update player bet if valid
+			
+			bet_flag = True # signal we went throught at least 1 round of betting
 
-						# Raise bet
-						elif player_choice == '2':
-							while True:
-								print(player.name,"Opens") if current_bet==0 else print(player.name,"Raises")
-								print("Input bet:")
-								try :
-									player.bet = int(input())	# set new bet
-								except ValueError:
-									print("Invalid input, must be a number")
-									continue
+
+
+
+
+					# # Decides to bet or fold:
+					# print("\nCurrent bet to match:",current_bet)
+					# print("Current player betted amount:",player.bet)
+					# print(player.name,"input decision:")
+					# print('1: Call')
+					# print('2: Raise')
+					# print('3: Fold')
+
+					# try:
+					# 	player_choice = input()
+
+					# 	# Call bet
+					# 	if player_choice == '1':
+					# 		print(player.name,"Checks") if current_bet==0 else print(player.name,"Calls")
+					# 		if player.money<current_bet:
+					# 			raise InsufficientFundsError("Insufficient funds. Go all in ? y/n")
+					# 		player.bet = current_bet	# update player bet if valid
+
+					# 	# Raise bet
+					# 	elif player_choice == '2':
+					# 		while True:
+					# 			print(player.name,"Opens") if current_bet==0 else print(player.name,"Raises")
+					# 			print("Input bet:")
+					# 			try :
+					# 				player.bet = int(input())	# set new bet
+					# 			except ValueError:
+					# 				print("Invalid input, must be a number")
+					# 				continue
 								
-								# Check player has enough money and that bet is valid (>= bid blind)
-								if player.bet<self.big_blind:
-									raise InvalidBetError ("Invalid bet. Bet needs to be at least the big blind ($%s)"%(self.big_blind))
-								if player.money<player.bet:
-									raise InsufficientFundsError("Insufficient funds. Go all in ? y/n")
-								if player.money==player.bet:
-									raise InsufficientFundsError("Go all in ? y/n")
+					# 			# Check player has enough money and that bet is valid (>= bid blind)
+					# 			if player.bet<self.big_blind:
+					# 				raise InvalidBetError ("Invalid bet. Bet needs to be at least the big blind ($%s)"%(self.big_blind))
+					# 			if player.money<player.bet:
+					# 				raise InsufficientFundsError("Insufficient funds. Go all in ? y/n")
+					# 			if player.money==player.bet:
+					# 				raise InsufficientFundsError("Go all in ? y/n")
 
 
-								# if bet valid
-								current_bet = player.bet	# update current highest bet
-								break
+					# 			# if bet valid
+					# 			current_bet = player.bet	# update current highest bet
+					# 			break
 						
-						# Fold
-						elif player_choice == '3':
-							player.status = "Folded" # update status
+					# 	# Fold
+					# 	elif player_choice == '3':
+					# 		player.status = "Folded" # update status
 						
-						else:
-							raise InvalidBetInputError("Invalid input.")
+					# 	else:
+					# 		raise InvalidBetInputError("Invalid input.")
 						
-						# if input valid
-						break # next player
+					# 	# if input valid
+					# 	break # next player
 
-					except (InvalidBetInputError, InvalidBetError) as e:
-						print(f"Error: {e}")
-						continue # re-prompt player
-					except (InsufficientFundsError) as e:
-						print(f"Error: {e}")
-						while True:
-							all_in_input = input()
-							if all_in_input in ['y', 'Y']:
-								player.bet = player.money
-								current_bet = player.bet
-								player.money = 0
-								all_in_flag = True
-								break
-							if all_in_input in ['n', 'N']:
-								break
-							else:
-								print("invalid input, please press 'y' or 'n'.")
-						continue # re-prompt player
+					# except (InvalidBetInputError, InvalidBetError) as e:
+					# 	print(f"Error: {e}")
+					# 	continue # re-prompt player
+					# except (InsufficientFundsError) as e:
+					# 	print(f"Error: {e}")
+					# 	while True:
+					# 		all_in_input = input()
+					# 		if all_in_input in ['y', 'Y']:
+					# 			player.bet = player.money
+					# 			current_bet = player.bet
+					# 			player.money = 0
+					# 			all_in_flag = True
+					# 			break
+					# 		if all_in_input in ['n', 'N']:
+					# 			break
+					# 		else:
+					# 			print("invalid input, please press 'y' or 'n'.")
+					# 	continue # re-prompt player
 
 	def bets_to_pot(self):
 		# updates pot and player money
 		for player in self.players:
 			self.pot += player.bet
 			player.money-=player.bet
+			player.betting_hist.append(player.bet)
 			player.bet = 0
 	
 	def pot_distrib(self):
@@ -496,22 +593,26 @@ class playerClass():
 		self.hand: list				# The two cards distributed to the player
 		self.money: int				# The amount of money the player has
 		self.bet: int				# The amount of money the player bets at each turn
-		self.betting_hist: int		# The total amount of a player's bet. Used when bets exceed a player's money (all in)
+		self.betting_hist: list		# History of a player's bet. Used when bets exceed a player's money (all in)
+		self.is_all_in: bool		# All-in flag
 		self.blind: str				# Big/Small blind or Button
 		self.status: str			# inGame / Folded
 		self.final_hand = list		# The final hand composed of the two distributed cards and the five common cards
 		self.hand_value: int		# The value of the final hand (ex: 0 for high card, 1 for pair, etc...)
+		self.is_human: bool			# Stores if a player is human or AI (for later use)
 	
 	def create_player(self,name):
 		self.name = name
 		self.hand = []
 		self.money = 5000 #TODO set as a global value (min_entry_fee)
-		self.betting_hist = 0
 		self.bet = 0
+		self.betting_hist = []
+		self.is_all_in = False
 		self.blind = ""
 		self.status = "inGame"
 		self.final_hand=[]
 		self.hand_value = 0
+		self.is_human = False
 
 	def clear_hand(self):
 		self.hand = []
@@ -526,6 +627,7 @@ class playerClass():
 		print("Current bet:", self.bet)
 		print("Blind:", self.blind)
 		print("Status:", self.status)
+		print("Human player ?:", self.is_human)
 		print()
 
 if __name__=="__main__":
@@ -539,7 +641,9 @@ if __name__=="__main__":
 		playerObject = playerClass()
 		playerObject.create_player("Player "+str(i))
 		player_list.append(playerObject)
-	
+
+	player_list[0].is_human = True #DEBUG
+
 	# print([vars(player) for player in player_list])
 
 	# Setting up game
@@ -576,6 +680,7 @@ if __name__=="__main__":
 		print(50*"-","Flop",50*"-")
 		game.cards_on_table=deck.draw(3)
 		game.betting_round(1)
+		game.bets_to_pot()
 
 		game.display_table()
 		deck.display_deck()
@@ -583,12 +688,12 @@ if __name__=="__main__":
 		print("\nPlayer Infos:\n")
 		print([player.display_player_info() for player in player_list])
 
-		game.bets_to_pot()
 
 		# turn
 		print(50*"-","Turn",50*"-")
 		game.cards_on_table.append(deck.draw(1)[0])
 		game.betting_round(2)
+		game.bets_to_pot()
 
 		game.display_table()
 		deck.display_deck()
@@ -596,12 +701,12 @@ if __name__=="__main__":
 		print("\nPlayer Infos:\n")
 		print([player.display_player_info() for player in player_list])
 
-		game.bets_to_pot()
 
 		# river
 		print(50*"-","River",50*"-")
 		game.cards_on_table.append(deck.draw(1)[0])
 		game.betting_round(3)
+		game.bets_to_pot()
 
 		game.display_table()
 		deck.display_deck()
@@ -609,7 +714,6 @@ if __name__=="__main__":
 		print("\nPlayer Infos:\n")
 		print([player.display_player_info() for player in player_list])
 
-		game.bets_to_pot()
 
 		# showdown
 		print(50*"-","Showdown",50*"-")
@@ -617,7 +721,6 @@ if __name__=="__main__":
 			player.final_hand, player.hand_value = game.get_hand_value(player)
 			print([card.name for card in player.final_hand])
 			print('hand_val:',player.hand_value)
-			input()
 
 		game.rotate_blinds()
 
