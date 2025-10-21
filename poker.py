@@ -193,7 +193,7 @@ class PokerGame():
 					print("invalid input, please press 'y' or 'n'.")
 			return 0 # re-prompt player
 	
-	def AI_play(self):
+	def AI_play(self, player):
 		# no security check for now (debug version)
 		print(player.name,"Checks") if self.current_bet==0 else print(player.name,"Calls")
 		player.bet = self.current_bet	# Current default behaviour: call all bet
@@ -238,81 +238,6 @@ class PokerGame():
 			
 			bet_flag = True # signal we went throught at least 1 round of betting
 
-
-
-
-
-					# # Decides to bet or fold:
-					# print("\nCurrent bet to match:",current_bet)
-					# print("Current player betted amount:",player.bet)
-					# print(player.name,"input decision:")
-					# print('1: Call')
-					# print('2: Raise')
-					# print('3: Fold')
-
-					# try:
-					# 	player_choice = input()
-
-					# 	# Call bet
-					# 	if player_choice == '1':
-					# 		print(player.name,"Checks") if current_bet==0 else print(player.name,"Calls")
-					# 		if player.money<current_bet:
-					# 			raise InsufficientFundsError("Insufficient funds. Go all in ? y/n")
-					# 		player.bet = current_bet	# update player bet if valid
-
-					# 	# Raise bet
-					# 	elif player_choice == '2':
-					# 		while True:
-					# 			print(player.name,"Opens") if current_bet==0 else print(player.name,"Raises")
-					# 			print("Input bet:")
-					# 			try :
-					# 				player.bet = int(input())	# set new bet
-					# 			except ValueError:
-					# 				print("Invalid input, must be a number")
-					# 				continue
-								
-					# 			# Check player has enough money and that bet is valid (>= bid blind)
-					# 			if player.bet<self.big_blind:
-					# 				raise InvalidBetError ("Invalid bet. Bet needs to be at least the big blind ($%s)"%(self.big_blind))
-					# 			if player.money<player.bet:
-					# 				raise InsufficientFundsError("Insufficient funds. Go all in ? y/n")
-					# 			if player.money==player.bet:
-					# 				raise InsufficientFundsError("Go all in ? y/n")
-
-
-					# 			# if bet valid
-					# 			current_bet = player.bet	# update current highest bet
-					# 			break
-						
-					# 	# Fold
-					# 	elif player_choice == '3':
-					# 		player.status = "Folded" # update status
-						
-					# 	else:
-					# 		raise InvalidBetInputError("Invalid input.")
-						
-					# 	# if input valid
-					# 	break # next player
-
-					# except (InvalidBetInputError, InvalidBetError) as e:
-					# 	print(f"Error: {e}")
-					# 	continue # re-prompt player
-					# except (InsufficientFundsError) as e:
-					# 	print(f"Error: {e}")
-					# 	while True:
-					# 		all_in_input = input()
-					# 		if all_in_input in ['y', 'Y']:
-					# 			player.bet = player.money
-					# 			current_bet = player.bet
-					# 			player.money = 0
-					# 			all_in_flag = True
-					# 			break
-					# 		if all_in_input in ['n', 'N']:
-					# 			break
-					# 		else:
-					# 			print("invalid input, please press 'y' or 'n'.")
-					# 	continue # re-prompt player
-
 	def bets_to_pot(self):
 		# updates pot and player money
 		for player in self.players:
@@ -321,11 +246,88 @@ class PokerGame():
 			player.betting_hist.append(player.bet)
 			player.bet = 0
 	
-	def pot_distrib(self):
+	def get_winners(self):
 		# Handles pot distribution at the end of a round
-		#TODO: all in system (add a betting history)
-		pass
+		# TODO: all in system (add a betting history, side pots)
+		# TODO: all player fold
+		# print(self.pot)
+		# print([[card.name for card in player.hand] for player in self.players])
+		# print([player.hand_value for player in self.players])
+		
+		ingame_players = [player for player in self.players if player.status == "inGame"]	# extracting player that have not folded
+		player_hand_values = [player.hand_value for player in ingame_players]				# extracting players hand values
+		high_hand = max(player_hand_values)													# highest hand value amongst players
+		winners = [player for player in ingame_players if player.hand_value == high_hand]	# potential winners
+		
+		print('-')
+		print(player_hand_values)
+		print(high_hand)
+		print([winner.name for winner in winners])
 
+		if len(winners) == 1:
+			if not winners[0].is_all_in:
+				# Only one winner, not all in
+				print(winners[0].name,"wins $",self.pot)
+				winners[0].money += self.pot
+				self.pot = 0
+		else:
+			if not any([winner.is_all_in for winner in winners]):
+				# tie, no on is all-in
+				# for player in winners:
+				if high_hand == 5:
+					# In case of full house determining the highest of threes, than twos
+					# Poker terminology: 
+					# "Trips" (or "Set") => refers to the three of a kind part
+					# "Pair" => refers to the two of a kind part.
+
+					winners_high_cards = {player.name: Counter(card.value for card in player.final_hand).most_common(1)[0][0]
+														for player in winners}	# extracting the Trips value for each players
+					winners_highest_value = max(winners_high_cards.values())	# extracting highest trips value
+
+					# Reducing winners_high_cards to those with the same trips value
+					winners_high_cards = {name: value
+										for name, value in winners_high_cards.items()
+										if value == winners_highest_value}
+
+					# filtering out the winners list, keeping only those with the same trips
+					winners = [player for player in winners if player.name in winners_high_cards.keys()]
+					
+					print('trips\n',[winner.name for winner in winners])
+
+					# Repeat this process for the pairs
+					if len (winners) > 1:
+						winners_high_cards = {player.name: Counter(card.value for card in player.final_hand).most_common(2)[1][0]
+															for player in winners}	# extracting the pair value for each players
+						winners_highest_value = max(winners_high_cards.values())	# extracting highest pair value
+
+						# Reducing winners_high_cards to those with the same pair value
+						winners_high_cards = {name: value
+											for name, value in winners_high_cards.items()
+											if value == winners_highest_value}
+
+						# filtering out the winners list, keeping only those with the same pair
+						winners = [player for player in winners if player.name in winners_high_cards.keys()]
+
+						print('pairs\n',[winner.name for winner in winners])
+					
+					# If tie still not broken, use high cards
+					if len (winners) > 1:
+						winners_high_cards = {player.name: [max(card.value for card in player.pocket)]
+												 for player in winners}	# extracting the highest pocket card value for each players
+						
+						winners_highest_value = max(winners_high_cards.values())
+
+						# Reducing winners_high_cards to those with the same highest pocket card value
+						winners_high_cards = {name: value
+											for name, value in winners_high_cards.items()
+											if value == winners_highest_value}
+
+						# filtering out the winners list, keeping only those with the same highest pocket card value
+						winners = [player for player in winners if player.name in winners_high_cards.keys()]
+						
+						print('high\n',[winner.name for winner in winners])
+			print('\nWinner(s):\n',[winner.name for winner in winners])
+			exit()
 	
 	@staticmethod
 	def is_straight(cards):
@@ -457,7 +459,7 @@ class PokerGame():
 		# Four of a kind: Four cards of the same value	
 		# Straight flush: Straight of the same suit	
 		# Royal flush: Highest straight of the same suit	
-		player_hand = player.hand
+		player_hand = player.pocket
 		cards = player_hand + self.cards_on_table
 		hand=[]
 		hand_val = 0
@@ -513,8 +515,6 @@ class PokerGame():
 			return hand, hand_val
 
 		# Full house
-		#TODO: use case 3 - 2 - 2 => need to take the highest pair here 
-		#TODO: priviledge full house to three of a kind if 3 - 3 
 		elif value_counts.most_common(2)[0][1] == 3 and value_counts.most_common(2)[1][1]>=2:
 			if value_counts.most_common(2)[1][1]==3:
 				# Full house with double triple cards
@@ -527,14 +527,20 @@ class PokerGame():
 					hand.remove(hand[2]) # remove third element to get 3 and 2 cards
 			else:
 				# second most common occurence is of 2 cards: regular house
-				if value_counts.most_common(3)[1][0] > value_counts.most_common(3)[2][0]:
-					hand = [card for card in cards \
-							if card.value == value_counts.most_common(2)[0][0] \
-							or card.value == value_counts.most_common(2)[1][0]]
+				if value_counts.most_common(3)[2][1] == 2 : # checking if there are 2 pairs
+					if value_counts.most_common(3)[1][0] > value_counts.most_common(3)[2][0]:
+						# taking the highest ranking pair to form the full house
+						hand = [card for card in cards \
+								if card.value == value_counts.most_common(2)[0][0] \
+								or card.value == value_counts.most_common(2)[1][0]]
+					else:
+						hand = [card for card in cards \
+								if card.value == value_counts.most_common(1)[0][0] \
+								or card.value == value_counts.most_common(3)[2][0]]
 				else:
 					hand = [card for card in cards \
-							if card.value == value_counts.most_common(1)[0][0] \
-							or card.value == value_counts.most_common(3)[2][0]]
+								if card.value == value_counts.most_common(2)[0][0] \
+								or card.value == value_counts.most_common(2)[1][0]]
 			print(player.name,"has a Full house:")
 			hand_val = 5
 			return hand, hand_val
@@ -590,20 +596,20 @@ class PokerGame():
 class playerClass():
 	def __init__(self):
 		self.name:str				# The name of the player
-		self.hand: list				# The two cards distributed to the player
+		self.pocket: list			# The two cards distributed to the player
 		self.money: int				# The amount of money the player has
 		self.bet: int				# The amount of money the player bets at each turn
 		self.betting_hist: list		# History of a player's bet. Used when bets exceed a player's money (all in)
 		self.is_all_in: bool		# All-in flag
 		self.blind: str				# Big/Small blind or Button
 		self.status: str			# inGame / Folded
-		self.final_hand = list		# The final hand composed of the two distributed cards and the five common cards
+		self.final_hand = list		# The final hand 
 		self.hand_value: int		# The value of the final hand (ex: 0 for high card, 1 for pair, etc...)
 		self.is_human: bool			# Stores if a player is human or AI (for later use)
 	
 	def create_player(self,name):
 		self.name = name
-		self.hand = []
+		self.pocket = []
 		self.money = 5000 #TODO set as a global value (min_entry_fee)
 		self.bet = 0
 		self.betting_hist = []
@@ -615,14 +621,14 @@ class playerClass():
 		self.is_human = False
 
 	def clear_hand(self):
-		self.hand = []
+		self.pocket = []
 		self.bet = 0
 		self.hand_value = None
 		self.final_hand = []
 	
 	def display_player_info(self):
 		print(self.name,":")
-		print("Hand:",[card.name for card in self.hand])
+		print("Pocket Cards:",[card.name for card in self.pocket])
 		print("Money:", self.money)
 		print("Current bet:", self.bet)
 		print("Blind:", self.blind)
@@ -637,12 +643,13 @@ if __name__=="__main__":
 	# Init players
 	# for now: hard set
 	player_list = []
-	for i in range(1,6):
+	n_players = 3
+	for i in range(n_players):
 		playerObject = playerClass()
-		playerObject.create_player("Player "+str(i))
+		playerObject.create_player("Player "+str(i+1))
 		player_list.append(playerObject)
 
-	player_list[0].is_human = True #DEBUG
+	# player_list[0].is_human = True #DEBUG TODO: dynamic selection + naming
 
 	# print([vars(player) for player in player_list])
 
@@ -658,7 +665,7 @@ if __name__=="__main__":
 		
 		# Distribute cards
 		for player in player_list:
-			player.hand = deck.draw(2)
+			player.pocket = deck.draw(2)
 
 		print(50*"-","Player Infos",50*"-")
 		for player in player_list:
@@ -711,16 +718,26 @@ if __name__=="__main__":
 		game.display_table()
 		deck.display_deck()
 
+
+		# DEBUG:
+		deck = DeckOfCards()
+		game.cards_on_table=deck.deck[:3] + [deck.deck[50]] + [deck.deck[24]]
+		player_list[0].pocket = [deck.deck[27]] + [deck.deck[37]]
+		player_list[1].pocket = [deck.deck[0]] + [deck.deck[37]]
+		
+		
 		print("\nPlayer Infos:\n")
 		print([player.display_player_info() for player in player_list])
-
 
 		# showdown
 		print(50*"-","Showdown",50*"-")
 		for player in player_list:
+			print()
 			player.final_hand, player.hand_value = game.get_hand_value(player)
 			print([card.name for card in player.final_hand])
-			print('hand_val:',player.hand_value)
+			# print('hand_val:',player.hand_value)
+
+		game.get_winners()
 
 		game.rotate_blinds()
 
