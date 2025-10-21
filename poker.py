@@ -67,7 +67,6 @@ class DeckOfCards():
 		cards = []
 		for i in range(n):
 			cards.append(self.deck.pop())
-
 		return cards
 
 	def display_deck(self):
@@ -234,9 +233,15 @@ class PokerGame():
 
 					if not player.is_human :
 						next_player = self.AI_play(player)
+				
+				if len([player for player in self.players if player.status=="inGame"])==1:
+					# Only 1 player in game, other have folded => early showdown
+					return 1
 
 			
 			bet_flag = True # signal we went throught at least 1 round of betting
+		
+		return 0
 
 	def bets_to_pot(self):
 		# updates pot and player money
@@ -260,77 +265,115 @@ class PokerGame():
 		winners = [player for player in ingame_players if player.hand_value == high_hand]	# potential winners
 		
 		print('-')
-		print(player_hand_values)
-		print(high_hand)
+		# print(player_hand_values)
+		# print(high_hand)
 		print([winner.name for winner in winners])
+		print([sorted([card.value for card in player.final_hand]) for player in winners])
 
-		if len(winners) == 1:
-			if not winners[0].is_all_in:
-				# Only one winner, not all in
-				print(winners[0].name,"wins $",self.pot)
-				winners[0].money += self.pot
-				self.pot = 0
-		else:
-			if not any([winner.is_all_in for winner in winners]):
-				# tie, no on is all-in
-				# for player in winners:
-				if high_hand == 5:
-					# In case of full house determining the highest of threes, than twos
-					# Poker terminology: 
-					# "Trips" (or "Set") => refers to the three of a kind part
-					# "Pair" => refers to the two of a kind part.
+		if len(winners) > 1:
+			# tie-breaker
+			# for player in winners:
+			if high_hand == 6:
+				# In case of full house determining the highest of threes, than twos
+				# Poker terminology: 
+				# "Trips" (or "Set") => refers to the three of a kind part
+				# "Pair" => refers to the two of a kind part.
 
-					winners_high_cards = {player.name: Counter(card.value for card in player.final_hand).most_common(1)[0][0]
-														for player in winners}	# extracting the Trips value for each players
-					winners_highest_value = max(winners_high_cards.values())	# extracting highest trips value
+				winners_high_cards = {player.name: Counter(card.value for card in player.final_hand).most_common(1)[0][0]
+													for player in winners}	# extracting the Trips value for each players
+				winners_highest_value = max(winners_high_cards.values())	# extracting highest trips value
 
-					# Reducing winners_high_cards to those with the same trips value
+				# Reducing winners_high_cards to those with the same trips value
+				winners_high_cards = {name: value
+									for name, value in winners_high_cards.items()
+									if value == winners_highest_value}
+
+				# filtering out the winners list, keeping only those with the same trips
+				winners = [player for player in winners if player.name in winners_high_cards.keys()]
+				
+				# print('filtered by trips\n',[winner.name for winner in winners])
+
+				# Repeat this process for the pairs
+				if len (winners) > 1:
+					winners_high_cards = {player.name: Counter(card.value for card in player.final_hand).most_common(2)[1][0]
+														for player in winners}	# extracting the pair value for each players
+					winners_highest_value = max(winners_high_cards.values())	# extracting highest pair value
+
+					# Reducing winners_high_cards to those with the same pair value
 					winners_high_cards = {name: value
 										for name, value in winners_high_cards.items()
 										if value == winners_highest_value}
 
-					# filtering out the winners list, keeping only those with the same trips
+					# filtering out the winners list, keeping only those with the same pair
+					winners = [player for player in winners if player.name in winners_high_cards.keys()]
+
+					# print('filtered by pairs\n',[winner.name for winner in winners])
+				
+				# If tie still not broken, use high pocket cards
+				if len (winners) > 1:
+					winners_high_cards = {player.name: [max(card.value for card in player.pocket)]
+												for player in winners}	# extracting the highest pocket card value for each players
+					
+					winners_highest_value = max(winners_high_cards.values())
+
+					# Reducing winners_high_cards to those with the same highest pocket card value
+					winners_high_cards = {name: value
+										for name, value in winners_high_cards.items()
+										if value == winners_highest_value}
+
+					# filtering out the winners list, keeping only those with the same highest pocket card value
 					winners = [player for player in winners if player.name in winners_high_cards.keys()]
 					
-					print('trips\n',[winner.name for winner in winners])
+					# print('filtered by high\n',[winner.name for winner in winners])
+			else:
+				# for other hands, only need to check highest cards:
+				
+				winners_high_cards = {player.name: sorted([card.value for card in player.final_hand])[-1]
+													for player in winners}	# extracting the highest card value for each players' hand
+				
+				winners_highest_value = max(winners_high_cards.values())	# extracting highest value amongst all players
 
-					# Repeat this process for the pairs
-					if len (winners) > 1:
-						winners_high_cards = {player.name: Counter(card.value for card in player.final_hand).most_common(2)[1][0]
-															for player in winners}	# extracting the pair value for each players
-						winners_highest_value = max(winners_high_cards.values())	# extracting highest pair value
+				# Reducing winners_high_cards to those with the same high card value
+				winners_high_cards = {name: value
+									for name, value in winners_high_cards.items()
+									if value == winners_highest_value}
 
-						# Reducing winners_high_cards to those with the same pair value
-						winners_high_cards = {name: value
-											for name, value in winners_high_cards.items()
-											if value == winners_highest_value}
+				# filtering out the winners list, keeping only those with the same high card value
+				winners = [player for player in winners if player.name in winners_high_cards.keys()]
 
-						# filtering out the winners list, keeping only those with the same pair
-						winners = [player for player in winners if player.name in winners_high_cards.keys()]
+				print('\nwinners after filtering with high card from final_hand:\n',[player.name for player in winners])
 
-						print('pairs\n',[winner.name for winner in winners])
+				# If tie still not broken, use high pocket cards
+				if len (winners) > 1:
+					winners_high_cards = {player.name: [max(card.value for card in player.pocket)]
+												for player in winners}	# extracting the highest pocket card value for each players
 					
-					# If tie still not broken, use high cards
-					if len (winners) > 1:
-						winners_high_cards = {player.name: [max(card.value for card in player.pocket)]
-												 for player in winners}	# extracting the highest pocket card value for each players
-						
-						winners_highest_value = max(winners_high_cards.values())
+					winners_highest_value = max(winners_high_cards.values())
 
-						# Reducing winners_high_cards to those with the same highest pocket card value
-						winners_high_cards = {name: value
-											for name, value in winners_high_cards.items()
-											if value == winners_highest_value}
+					# Reducing winners_high_cards to those with the same highest pocket card value
+					winners_high_cards = {name: value
+										for name, value in winners_high_cards.items()
+										if value == winners_highest_value}
 
-						# filtering out the winners list, keeping only those with the same highest pocket card value
-						winners = [player for player in winners if player.name in winners_high_cards.keys()]
-						
-						print('high\n',[winner.name for winner in winners])
-			print('\nWinner(s):\n',[winner.name for winner in winners])
-			exit()
-	
+					# filtering out the winners list, keeping only those with the same highest pocket card value
+					winners = [player for player in winners if player.name in winners_high_cards.keys()]
+				
+				
+
+		print('\nWinner(s):\n',[winner.name for winner in winners])
+					
+		return winners
+
+	def split_pot(self, winners):
+		if len(winners)==1:
+			# single winner
+			winners[0].money += self.pot
+			self.pot = 0
+
+
 	@staticmethod
 	def is_straight(cards):
+		# TODO: Ace straight is preceding or following a KING (functional issue)
 		# Checks if straight, straight flush, or royal flush
 		# input: 
 		# - sorted_cards: list of 7 sorted cards
@@ -447,7 +490,7 @@ class PokerGame():
 				straight_type = 1
 
 		# no straight
-		return output_cards, straight_type
+		return output_cards[-5:], straight_type	#Note: only returning the highest 5 cards of the straight
 			
 	def get_hand_value(self, player):
 		# High card: single value of highest card
@@ -455,6 +498,7 @@ class PokerGame():
 		# Two pairs: two times 2 cards of the same value
 		# Three of a kind: 3 cards of the same value
 		# Straight: sequence of 5 cards in increasing value (Ace can precede 2 or follow up King, but not both), not of the same suit
+		# Flush: 5 cards of the same suit, not in sequential order
 		# Full House: Combination of three of a kind and a pair	
 		# Four of a kind: Four cards of the same value	
 		# Straight flush: Straight of the same suit	
@@ -490,28 +534,30 @@ class PokerGame():
 		# 	+ [deck.deck[25]] + [deck.deck[50]] + [deck.deck[40]] # High card
 		cards_values = [card.value for card in cards]
 		cards_colors = [card.color for card in cards]
-
+		value_counts = Counter(cards_values)
+		color_counts = Counter(cards_colors)
+		
 		print("Cards for",player.name)
 		print([card.name for card in cards])
 		
-		# Flushes
+		# Straight Flushes
 		hand, straight_hand_type = self.is_straight(cards)
 		if straight_hand_type == 3:
 			print(player.name,"has a Royal Flush:")
-			hand_val = 8
+			hand_val = 9
 			return hand, hand_val
 
 		elif straight_hand_type == 2:
 			print(player.name,"has a Straight Flush:")
-			hand_val = 7
+			hand_val = 8
 			return hand, hand_val
 		
 		# Four of a kind
-		value_counts = Counter(cards_values)
-		if value_counts.most_common(1)[0][1] == 4:
+		if value_counts.most_common(1)[0][1] == 4:	# more than 4 is not possible
 			hand = [card for card in cards if card.value == value_counts.most_common(1)[0][0]]
 			print(player.name,"has Four of a Kind:")
-			hand_val = 6
+			hand.sort(key=lambda x:x.value)	# order list
+			hand_val = 7
 			return hand, hand_val
 
 		# Full house
@@ -542,9 +588,18 @@ class PokerGame():
 								if card.value == value_counts.most_common(2)[0][0] \
 								or card.value == value_counts.most_common(2)[1][0]]
 			print(player.name,"has a Full house:")
-			hand_val = 5
+			hand_val = 6
 			return hand, hand_val
 		
+		# Flush / Color
+		elif color_counts.most_common(1)[0][1]>=5:
+			print(player.name,"has a Flush:")
+			hand = [card for card in cards 
+					if card.color == color_counts.most_common(1)[0][0]]
+			hand.sort(key=lambda x:x.value)	# order list to output highest values
+			hand_val = 5
+			return hand[-5:], hand_val
+
 		# Straight
 		elif straight_hand_type == 1:
 			print(player.name,"has a Straight:")
@@ -557,6 +612,7 @@ class PokerGame():
 			print(player.name,"has a Three of a kind:")
 			hand = [card for card in cards if card.value == value_counts.most_common(1)[0][0]]
 			hand_val = 3
+			hand.sort(key=lambda x:x.value)	# order list
 			return hand, hand_val
 
 		# Pairs
@@ -568,6 +624,7 @@ class PokerGame():
 			print(player.name,"has Two Pairs:")	
 			hand = [card for card in cards if card.value in pairs_val[-2:]]
 			hand_val = 2
+			hand.sort(key=lambda x:x.value)	# order list
 			return hand, hand_val
 
 		elif pair_cnt == 1: 
@@ -593,6 +650,22 @@ class PokerGame():
 		for player in self.players:
 			print(player.name,":",player.bet)
 
+	def play(self, n_cards_to_distrib, round_name, round_n):
+		print(50*'-',round_name,50*'-')
+		game.cards_on_table.extend(deck.draw(n_cards_to_distrib))
+		stop_game = game.betting_round(round_n)
+		game.bets_to_pot()
+
+		game.display_table()
+		deck.display_deck()
+
+		print("\nPlayer Infos:\n")
+		print([player.display_player_info() for player in self.players])
+
+		return stop_game
+		
+
+ 
 class playerClass():
 	def __init__(self):
 		self.name:str				# The name of the player
@@ -636,9 +709,67 @@ class playerClass():
 		print("Human player ?:", self.is_human)
 		print()
 
-if __name__=="__main__":
+def unit_tests():
 	# Init a deck of cards
 	deck = DeckOfCards()
+	'''
+	Deck index:
+	0 : Two of Heart
+	1 : Three of Heart
+	2 : Four of Heart
+	3 : Five of Heart
+	4 : Six of Heart
+	5 : Seven of Heart
+	6 : Eight of Heart
+	7 : Nine of Heart
+	8 : Ten of Heart
+	9 : Jack of Heart
+	10 : Queen of Heart
+	11 : King of Heart
+	12 : Ace of Heart
+
+	13 : Two of Spikes
+	14 : Three of Spikes
+	15 : Four of Spikes
+	16 : Five of Spikes
+	17 : Six of Spikes
+	18 : Seven of Spikes
+	19 : Eight of Spikes
+	20 : Nine of Spikes
+	21 : Ten of Spikes
+	22 : Jack of Spikes
+	23 : Queen of Spikes
+	24 : King of Spikes
+	25 : Ace of Spikes
+
+	26 : Two of Clubs
+	27 : Three of Clubs
+	28 : Four of Clubs
+	29 : Five of Clubs
+	30 : Six of Clubs
+	31 : Seven of Clubs
+	32 : Eight of Clubs
+	33 : Nine of Clubs
+	34 : Ten of Clubs
+	35 : Jack of Clubs
+	36 : Queen of Clubs
+	37 : King of Clubs
+	38 : Ace of Clubs
+
+	39 : Two of Diamonds
+	40 : Three of Diamonds
+	41 : Four of Diamonds
+	42 : Five of Diamonds
+	43 : Six of Diamonds
+	44 : Seven of Diamonds
+	45 : Eight of Diamonds
+	46 : Nine of Diamonds
+	47 : Ten of Diamonds
+	48 : Jack of Diamonds
+	49 : Queen of Diamonds
+	50 : King of Diamonds
+	51 : Ace of Diamonds
+	'''
 
 	# Init players
 	# for now: hard set
@@ -649,83 +780,17 @@ if __name__=="__main__":
 		playerObject.create_player("Player "+str(i+1))
 		player_list.append(playerObject)
 
-	# player_list[0].is_human = True #DEBUG TODO: dynamic selection + naming
-
-	# print([vars(player) for player in player_list])
-
 	# Setting up game
 	game = PokerGame()
 	game.init_game(player_list)
 	game.init_blinds()
 
-	while(1):
-		# reset table cards and deck of cards (re-shuffled)
-		deck.reset_deck()
-		game.reset_table()
-		
-		# Distribute cards
-		for player in player_list:
-			player.pocket = deck.draw(2)
+	def run_test_get_hand_value():
+		# dummy bets:
+		for i in range(4):
+			game.betting_round(0)
+			game.bets_to_pot()
 
-		print(50*"-","Player Infos",50*"-")
-		for player in player_list:
-			player.display_player_info()
-
-		# pre-flop
-		print(50*"-","Pre-Flop",50*"-")
-		game.betting_round(0)
-		game.bets_to_pot()
-
-		game.display_table()
-
-		print("\nPlayer Infos:\n")
-		print([player.display_player_info() for player in player_list])
-
-		
-		
-		# flop
-		print(50*"-","Flop",50*"-")
-		game.cards_on_table=deck.draw(3)
-		game.betting_round(1)
-		game.bets_to_pot()
-
-		game.display_table()
-		deck.display_deck()
-
-		print("\nPlayer Infos:\n")
-		print([player.display_player_info() for player in player_list])
-
-
-		# turn
-		print(50*"-","Turn",50*"-")
-		game.cards_on_table.append(deck.draw(1)[0])
-		game.betting_round(2)
-		game.bets_to_pot()
-
-		game.display_table()
-		deck.display_deck()
-
-		print("\nPlayer Infos:\n")
-		print([player.display_player_info() for player in player_list])
-
-
-		# river
-		print(50*"-","River",50*"-")
-		game.cards_on_table.append(deck.draw(1)[0])
-		game.betting_round(3)
-		game.bets_to_pot()
-
-		game.display_table()
-		deck.display_deck()
-
-
-		# DEBUG:
-		deck = DeckOfCards()
-		game.cards_on_table=deck.deck[:3] + [deck.deck[50]] + [deck.deck[24]]
-		player_list[0].pocket = [deck.deck[27]] + [deck.deck[37]]
-		player_list[1].pocket = [deck.deck[0]] + [deck.deck[37]]
-		
-		
 		print("\nPlayer Infos:\n")
 		print([player.display_player_info() for player in player_list])
 
@@ -736,8 +801,220 @@ if __name__=="__main__":
 			player.final_hand, player.hand_value = game.get_hand_value(player)
 			print([card.name for card in player.final_hand])
 			# print('hand_val:',player.hand_value)
+	
+		return [player.hand_value for player in player_list]
 
-		game.get_winners()
+	def run_test_get_winner():
+		# dummy bets:
+		for i in range(4):
+			game.betting_round(0)
+			game.bets_to_pot()
+
+		print("\nPlayer Infos:\n")
+		print([player.display_player_info() for player in player_list])
+
+		# showdown
+		print(50*"-","Showdown",50*"-")
+		for player in player_list:
+			print()
+			player.final_hand, player.hand_value = game.get_hand_value(player)
+			print([card.name for card in player.final_hand])
+			# print('hand_val:',player.hand_value)
+	
+		return game.get_winners()
+
+	# ----------------------------------------UNIT TESTS----------------------------------------------- 
+	# full house
+	## 1 full house
+	game.cards_on_table=[deck.deck[0]] + [deck.deck[2]] + [deck.deck[23]] + [deck.deck[17]] + [deck.deck[26]] #2-4-Q-6-2
+	player_list[0].pocket = [deck.deck[13]] + [deck.deck[36]] #2-Q
+	player_list[1].pocket = [deck.deck[24]] + [deck.deck[25]] #K-A
+	player_list[2].pocket = [deck.deck[24]] + [deck.deck[25]] #K-A
+	assert (run_test_get_winner() == [player_list[0]]), "Full house - test 1 failed."
+
+	## 1 full house, other players have 3 of a kind
+	game.cards_on_table=[deck.deck[0]] + [deck.deck[2]] + [deck.deck[13]] + [deck.deck[17]] + [deck.deck[26]] #2-4-2-6-2
+	player_list[0].pocket = [deck.deck[17]] + [deck.deck[38]] #6-A
+	player_list[1].pocket = [deck.deck[21]] + [deck.deck[5]]  #A-7
+	player_list[2].pocket = [deck.deck[6]] + [deck.deck[3]]   #8-5
+	assert (run_test_get_winner() == [player_list[0]]), "Full house - test 2 failed."
+	
+	## 2 full house, player 1 has a higher card
+	game.cards_on_table=[deck.deck[0]] + [deck.deck[2]] + [deck.deck[13]] + [deck.deck[17]] + [deck.deck[26]] #2-4-2-6-2
+	player_list[0].pocket = [deck.deck[17]] + [deck.deck[38]] #6-A
+	player_list[1].pocket = [deck.deck[17]] + [deck.deck[5]]  #6-7
+	player_list[2].pocket = [deck.deck[6]] + [deck.deck[3]]   #8-5
+	assert (run_test_get_winner() == [player_list[0]]), "Full house - test 3 failed."
+	
+	## 2 full house, perfect tie
+	game.cards_on_table=[deck.deck[0]] + [deck.deck[2]] + [deck.deck[13]] + [deck.deck[17]] + [deck.deck[26]] #2-4-2-6-2
+	player_list[0].pocket = [deck.deck[17]] + [deck.deck[38]] #6-A
+	player_list[1].pocket = [deck.deck[17]] + [deck.deck[38]] #6-A
+	player_list[2].pocket = [deck.deck[6]] + [deck.deck[3]]   #8-5
+	assert (run_test_get_winner() == [player_list[0],player_list[1]]), "Full house - test 4 failed."
+	
+	# straights
+	## player 1 has a straight
+	game.cards_on_table=[deck.deck[0]] + [deck.deck[14]] + [deck.deck[28]] + [deck.deck[3]] + [deck.deck[36]] #2-3-4-5-Q
+	player_list[0].pocket = [deck.deck[17]] + [deck.deck[36]] #6-K
+	player_list[1].pocket = [deck.deck[18]] + [deck.deck[36]] #7-K
+	player_list[2].pocket = [deck.deck[6]] + [deck.deck[3]]   #8-5
+	assert (run_test_get_winner() == [player_list[0]]), "Straights - test 1 failed."
+
+	## player 1 and 2 have a straight or different heights
+	game.cards_on_table=[deck.deck[14]] + [deck.deck[28]] + [deck.deck[3]] + [deck.deck[43]] + [deck.deck[36]] #3-4-5-6-Q
+	player_list[0].pocket = [deck.deck[31]] + [deck.deck[36]] #7-K
+	player_list[1].pocket = [deck.deck[0]] + [deck.deck[36]]  #2-K
+	player_list[2].pocket = [deck.deck[6]] + [deck.deck[3]]   #8-5
+	assert (run_test_get_winner() == [player_list[0]]), "Straights - test 2 failed."
+	
+	## players have straights and straight flushes
+	game.cards_on_table=[deck.deck[1]] + [deck.deck[2]] + [deck.deck[3]] + [deck.deck[4]] + [deck.deck[36]] #3-4-5-6-Q
+	player_list[0].pocket = [deck.deck[5]] + [deck.deck[36]]  #7-K
+	player_list[1].pocket = [deck.deck[31]] + [deck.deck[36]] #2-K
+	player_list[2].pocket = [deck.deck[41]] + [deck.deck[42]] #8-5
+	assert (run_test_get_winner() == [player_list[0]]), "Straights - test 3 failed."
+
+	# Flushes
+	## player 1 has a flush
+	game.cards_on_table=[deck.deck[1]] + [deck.deck[3]] + [deck.deck[8]] + [deck.deck[11]] + [deck.deck[36]] #3-5-10-K-Q
+	player_list[0].pocket = [deck.deck[5]] + [deck.deck[36]]  #7-K
+	player_list[1].pocket = [deck.deck[31]] + [deck.deck[36]] #2-K
+	player_list[2].pocket = [deck.deck[41]] + [deck.deck[42]] #8-5
+	assert (run_test_get_winner() == [player_list[0]]), "Flushes - test 1 failed."
+
+	## multiple players have a flush, one has a higher flush
+	game.cards_on_table=[deck.deck[1]] + [deck.deck[3]] + [deck.deck[8]] + [deck.deck[11]] + [deck.deck[36]] #3-5-10-K-Q
+	player_list[0].pocket = [deck.deck[5]] + [deck.deck[12]]  #7-A
+	player_list[1].pocket = [deck.deck[0]] + [deck.deck[2]]   #2-4
+	player_list[2].pocket = [deck.deck[41]] + [deck.deck[42]] #8-5
+	assert (run_test_get_winner() == [player_list[0]]), "Flushes - test 2 failed."
+
+	# Pairs et al
+	## one player has one pair
+	game.cards_on_table=[deck.deck[1]] + [deck.deck[3]] + [deck.deck[8]] + [deck.deck[11]] + [deck.deck[36]] #3-5-10-K-Q
+	player_list[0].pocket = [deck.deck[16]] + [deck.deck[39]] #5-2
+	player_list[1].pocket = [deck.deck[26]] + [deck.deck[41]] #2-4
+	player_list[2].pocket = [deck.deck[45]] + [deck.deck[38]] #8-A
+	assert (run_test_get_winner() == [player_list[0]]), "Pairs et al - test 1 failed."
+
+	## two players have one pair, player 1 has a higher one
+	game.cards_on_table=[deck.deck[1]] + [deck.deck[2]] + [deck.deck[8]] + [deck.deck[11]] + [deck.deck[36]] #3-4-10-K-Q
+	player_list[0].pocket = [deck.deck[42]] + [deck.deck[29]] #5-5
+	player_list[1].pocket = [deck.deck[26]] + [deck.deck[39]] #2-2
+	player_list[2].pocket = [deck.deck[45]] + [deck.deck[38]] #8-A
+	assert (run_test_get_winner() == [player_list[0]]), "Pairs et al - test 2 failed."
+
+	## two players have one pair, player 1 has two pairs
+	game.cards_on_table=[deck.deck[1]] + [deck.deck[2]] + [deck.deck[8]] + [deck.deck[11]] + [deck.deck[36]] #3-4-10-K-Q
+	player_list[0].pocket = [deck.deck[34]] + [deck.deck[50]] #10-K
+	player_list[1].pocket = [deck.deck[21]] + [deck.deck[13]] #10-2
+	player_list[2].pocket = [deck.deck[45]] + [deck.deck[38]] #8-A
+	assert (run_test_get_winner() == [player_list[0]]), "Pairs et al - test 3 failed."
+
+	## two players have one pair, player 1 has higher pocket card
+	game.cards_on_table=[deck.deck[1]] + [deck.deck[2]] + [deck.deck[8]] + [deck.deck[11]] + [deck.deck[36]] #3-4-10-K-Q
+	player_list[0].pocket = [deck.deck[34]] + [deck.deck[51]] #10-A
+	player_list[1].pocket = [deck.deck[21]] + [deck.deck[13]] #10-2
+	player_list[2].pocket = [deck.deck[45]] + [deck.deck[38]] #8-A
+	assert (run_test_get_winner() == [player_list[0]]), "Pairs et al - test 4 failed."
+
+	## one has a four of a kind
+	game.cards_on_table=[deck.deck[3]] + [deck.deck[16]] + [deck.deck[34]] + [deck.deck[11]] + [deck.deck[36]] #5-5-10-K-Q
+	player_list[0].pocket = [deck.deck[29]] + [deck.deck[42]] #5-5
+	player_list[1].pocket = [deck.deck[37]] + [deck.deck[49]] #K-Q
+	player_list[2].pocket = [deck.deck[0]] + [deck.deck[39]] #2-2
+	assert (run_test_get_winner() == [player_list[0]]), "Pairs et al - test 5 failed."
+
+	## one has a four of a kind, one has full house, another has three of a kind
+	game.cards_on_table=[deck.deck[3]] + [deck.deck[16]] + [deck.deck[34]] + [deck.deck[10]] + [deck.deck[36]] #5-5-10-Q-Q
+	player_list[0].pocket = [deck.deck[29]] + [deck.deck[42]] #5-5
+	player_list[1].pocket = [deck.deck[37]] + [deck.deck[49]] #K-Q
+	player_list[2].pocket = [deck.deck[0]] + [deck.deck[2]] #2-4
+	assert (run_test_get_winner() == [player_list[0]]), "Pairs et al - test 6 failed."
+
+	# High Card
+	## one has a four of a kind, one has full house, another has three of a kind
+	game.cards_on_table=[deck.deck[3]] + [deck.deck[15]] + [deck.deck[34]] + [deck.deck[10]] + [deck.deck[32]] #5-4-10-Q-8
+	player_list[0].pocket = [deck.deck[50]] + [deck.deck[25]] #K-A
+	player_list[1].pocket = [deck.deck[37]] + [deck.deck[26]] #K-2
+	player_list[2].pocket = [deck.deck[0]] + [deck.deck[1]] #2-3
+	assert (run_test_get_winner() == [player_list[0]]), "High - test 1 failed."
+
+	print('All tests passed !')
+		
+
+
+if __name__=="__main__":
+	tests = False
+	if tests:
+		unit_tests()
+		exit()
+	
+	
+	# Init a deck of cards
+	deck = DeckOfCards()
+
+	# Init players
+	# for now: hard set
+	player_list = []
+	n_players = 3
+	for i in range(n_players):
+		playerObject = playerClass()
+		playerObject.create_player("Player "+str(i+1))
+		playerObject.is_human = True
+
+		player_list.append(playerObject)
+
+	# player_list[0].is_human = True #DEBUG TODO: dynamic selection + naming
+
+	# print([vars(player) for player in player_list])
+
+	# Setting up game
+	game = PokerGame()
+	game.init_game(player_list)
+	game.init_blinds()
+	cnt_games = 0 # counts the number of games to update the blinds
+
+	while(1):
+		# reset table cards and deck of cards (re-shuffled)
+		deck.reset_deck()
+		game.reset_table()
+		stop_game = 0
+		cnt_games += 1		
+		
+		# Distribute cards
+		for player in player_list:
+			player.pocket = deck.draw(2)
+
+		print(50*"-","Player Infos",50*"-")
+		for player in player_list:
+			player.display_player_info()
+
+		gameflow = [(0, "Pre-Flop", 0),
+					(3, "Flop", 1),
+					(1, "Turn", 2),
+					(1, "River", 3)]
+
+		for n_cards_to_distrib, round_name, round_n in gameflow:
+			stop_game = game.play(n_cards_to_distrib, round_name, round_n)
+			if stop_game :
+				# no showdown on win by fold
+				winners = [player for player in player_list if player.status == "inGame"]
+				print('\nWinner(s):\n',[winner.name for winner in winners])
+				print()
+				break
+		else:
+			# showdown	#TODO: make a function of game
+			print(50*"-","Showdown",50*"-")
+			for player in player_list:
+				print()
+				player.final_hand, player.hand_value = game.get_hand_value(player)
+				print([card.name for card in player.final_hand])
+				# print('hand_val:',player.hand_value)
+
+			winners = game.get_winners()
+			game.split_pot(winners)
 
 		game.rotate_blinds()
 
