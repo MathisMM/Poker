@@ -90,6 +90,9 @@ class PokerGame():
 	def reset_table(self):
 		self.cards_on_table = []
 		self.pot = 0
+		for player in self.players:
+			player.status="inGame"
+			# TODO: pop player if money = 0 (here ?)
 
 	def init_blinds(self):
 		self.players[-1].blind = "big_blind"
@@ -199,6 +202,7 @@ class PokerGame():
 		return 1 # next player
 
 	def betting_round(self, round):
+		#TODO: min raise is the amount of previous raise
 		# Handles betting system
 		if round == 0:
 			# pre-flop first betting round
@@ -211,7 +215,7 @@ class PokerGame():
 		else:
 			self.current_bet = 0	# allows for checks in later rounds 
 
-		bet_flag = False # dummy flag to go through while loop at least once
+		bet_flag = False # dummy flag to go through while loop at least once (necessary after pre-flop)
 
 		while (len(set([player.bet for player in self.players if player.status == "inGame"]))!=1) or (bet_flag==False): # while players have different bets
 			# convert list of player bets into a set and checks set size. If set size == 1 => all bets are the same
@@ -226,6 +230,9 @@ class PokerGame():
 				while not next_player:
 					if player.is_all_in:
 						print(player.name,"is already All-in.")
+						print(player.bet)
+						print(game.pot)
+						input()
 						break
 
 					if player.is_human:
@@ -252,21 +259,13 @@ class PokerGame():
 			player.bet = 0
 	
 	def get_winners(self):
-		# Handles pot distribution at the end of a round
-		# TODO: all in system (add a betting history, side pots)
-		# TODO: all player fold
-		# print(self.pot)
-		# print([[card.name for card in player.hand] for player in self.players])
-		# print([player.hand_value for player in self.players])
-		
+		# Handles pot distribution at the end of a round	
 		ingame_players = [player for player in self.players if player.status == "inGame"]	# extracting player that have not folded
 		player_hand_values = [player.hand_value for player in ingame_players]				# extracting players hand values
 		high_hand = max(player_hand_values)													# highest hand value amongst players
 		winners = [player for player in ingame_players if player.hand_value == high_hand]	# potential winners
 		
 		print('-')
-		# print(player_hand_values)
-		# print(high_hand)
 		print([winner.name for winner in winners])
 		print([sorted([card.value for card in player.final_hand]) for player in winners])
 
@@ -341,7 +340,7 @@ class PokerGame():
 				# filtering out the winners list, keeping only those with the same high card value
 				winners = [player for player in winners if player.name in winners_high_cards.keys()]
 
-				print('\nwinners after filtering with high card from final_hand:\n',[player.name for player in winners])
+				# print('\nwinners after filtering with high card from final_hand:\n',[player.name for player in winners])
 
 				# If tie still not broken, use high pocket cards
 				if len (winners) > 1:
@@ -365,10 +364,19 @@ class PokerGame():
 		return winners
 
 	def split_pot(self, winners):
-		if len(winners)==1:
-			# single winner
-			winners[0].money += self.pot
-			self.pot = 0
+		if not any(player.is_all_in for player in winners):
+			if len(winners)==1:
+				# single winner
+				winners[0].money += self.pot
+				self.pot = 0
+			if len(winners)>1:
+				# If no one was all-in, split the pot
+				for player in winners:
+					player.money += math.floor(self.pot/len(winners))
+				self.pot=0
+		else:
+			#TODO
+			pass
 
 
 	@staticmethod
@@ -934,12 +942,20 @@ def unit_tests():
 	assert (run_test_get_winner() == [player_list[0]]), "Pairs et al - test 6 failed."
 
 	# High Card
-	## one has a four of a kind, one has full house, another has three of a kind
+	## one winner
 	game.cards_on_table=[deck.deck[3]] + [deck.deck[15]] + [deck.deck[34]] + [deck.deck[10]] + [deck.deck[32]] #5-4-10-Q-8
 	player_list[0].pocket = [deck.deck[50]] + [deck.deck[25]] #K-A
 	player_list[1].pocket = [deck.deck[37]] + [deck.deck[26]] #K-2
 	player_list[2].pocket = [deck.deck[0]] + [deck.deck[1]] #2-3
 	assert (run_test_get_winner() == [player_list[0]]), "High - test 1 failed."
+
+	# High Card
+	## two winners
+	game.cards_on_table=[deck.deck[3]] + [deck.deck[15]] + [deck.deck[34]] + [deck.deck[10]] + [deck.deck[32]] #5-4-10-Q-8
+	player_list[0].pocket = [deck.deck[50]] + [deck.deck[13]] #K-2
+	player_list[1].pocket = [deck.deck[37]] + [deck.deck[26]] #K-2
+	player_list[2].pocket = [deck.deck[0]] + [deck.deck[1]] #2-3
+	assert (run_test_get_winner() == [player_list[0],player_list[1]]), "High - test 2 failed."
 
 	print('All tests passed !')
 		
@@ -981,7 +997,7 @@ if __name__=="__main__":
 		deck.reset_deck()
 		game.reset_table()
 		stop_game = 0
-		cnt_games += 1		
+		cnt_games += 1
 		
 		# Distribute cards
 		for player in player_list:
@@ -990,6 +1006,10 @@ if __name__=="__main__":
 		print(50*"-","Player Infos",50*"-")
 		for player in player_list:
 			player.display_player_info()
+
+		print("Blinds:")
+		print("Big blind:", game.big_blind)
+		print("Small blind:", game.small_blind)
 
 		gameflow = [(0, "Pre-Flop", 0),
 					(3, "Flop", 1),
@@ -1002,7 +1022,7 @@ if __name__=="__main__":
 				# no showdown on win by fold
 				winners = [player for player in player_list if player.status == "inGame"]
 				print('\nWinner(s):\n',[winner.name for winner in winners])
-				print()
+				game.split_pot(winners)
 				break
 		else:
 			# showdown	#TODO: make a function of game
@@ -1017,5 +1037,10 @@ if __name__=="__main__":
 			game.split_pot(winners)
 
 		game.rotate_blinds()
+		# Every 5 games, increase blinds
+		if cnt_games%5==0:
+			# TODO: add max blinds
+			game.small_blind*=2
+			game.big_blind*=2
 
 		input()
